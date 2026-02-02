@@ -34,6 +34,8 @@ python3 --version
 - **成功**：继续步骤 2
 - **失败**：告知用户安装 Python（https://www.python.org/downloads/），等待用户安装后再继续
 
+**说明**：脚本会自动检测并安装缺失的 Python 依赖到用户目录，无需手动安装或配置虚拟环境。
+
 ### 2. 验证文件格式
 
 检查文件扩展名：
@@ -42,14 +44,16 @@ python3 --version
 
 ### 3. 执行转换
 
-使用 Bash 工具运行转换脚本：
+使用 Bash 工具运行转换脚本（依赖会自动安装）：
 
 ```bash
-# 使用便捷脚本（自动激活全局虚拟环境）
+# 使用便捷脚本
 ./convert.sh <file_path> [extract_images] [output_dir]
 
-# 或手动激活全局虚拟环境后运行
-source ~/.claude/venvs/docugenius-converter/bin/activate  # Windows: %USERPROFILE%\.claude\venvs\docugenius-converter\Scripts\activate
+# Windows
+convert.bat <file_path> [extract_images] [output_dir]
+
+# 或直接运行 Python 脚本
 python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 ```
 
@@ -111,43 +115,27 @@ python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 
 ## 依赖安装
 
-当转换脚本报错"缺少依赖库"时，引导用户安装：
+依赖会在首次运行时自动安装到用户目录，无需手动操作。
 
-### 方式 1: 运行安装脚本（推荐）
+**自动安装说明**：
+- 使用 `pip install --user` 安装到用户目录
+- 不受 macOS PEP 668 系统保护限制
+- 无需虚拟环境
+- 所有项目共享
 
-```bash
-# Windows
-install.bat
+**手动安装（可选）**：
 
-# macOS/Linux
-chmod +x install.sh && ./install.sh
-```
-
-### 方式 2: 使用全局共享虚拟环境（推荐）
-
-安装脚本会自动创建全局虚拟环境 `~/.claude/venvs/docugenius-converter`，所有项目共享此环境，无需重复安装。
-
-**手动创建全局虚拟环境**：
+如果自动安装失败，可以手动安装：
 
 ```bash
-# 创建并激活全局虚拟环境
-python3 -m venv ~/.claude/venvs/docugenius-converter
-source ~/.claude/venvs/docugenius-converter/bin/activate
+# 安装所有依赖
+pip install --user python-docx openpyxl python-pptx pdfplumber
 
-# 安装依赖
-pip install -r requirements.txt
-```
-
-### 方式 3: 按需安装特定库
-
-```bash
-# 激活全局虚拟环境后
-source ~/.claude/venvs/docugenius-converter/bin/activate
-
-pip install python-docx  # Word
-pip install openpyxl     # Excel
-pip install python-pptx  # PowerPoint
-pip install pdfplumber   # PDF
+# 或仅安装需要的库
+pip install --user python-docx  # Word
+pip install --user openpyxl     # Excel
+pip install --user python-pptx  # PowerPoint
+pip install --user pdfplumber   # PDF
 ```
 
 ## 错误处理

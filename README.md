@@ -39,6 +39,7 @@ Claude Code 默认只能直接读取 Markdown 和纯文本文件。当你上传 
 - 总依赖仅 10-15MB
 - 按需加载，只检测当前文件类型所需的库
 - 智能缓存，避免重复检查依赖
+- **自动安装**：首次运行时自动安装依赖到用户目录
 
 ## 安装
 
@@ -63,32 +64,19 @@ git clone https://github.com/yourusername/docugenius-converter-skill.git %USERPR
 
 ### 3. 安装依赖
 
-首次使用 Skill 时，Claude Code 会自动检测依赖。如缺少依赖，会引导你安装。
+**依赖会在首次使用时自动安装**，无需手动操作。
 
-**推荐方式**：运行安装脚本，自动创建全局共享虚拟环境（所有项目共用，只需安装一次）：
-
-```bash
-# macOS/Linux
-chmod +x install.sh && ./install.sh
-
-# Windows
-install.bat
-```
-
-**说明**：
-- 虚拟环境安装在 `~/.claude/venvs/docugenius-converter`
-- 所有使用此 skill 的项目共享此环境，无需重复安装
-- 避免 macOS PEP 668 系统保护限制
+- Python 依赖会自动安装到用户目录（使用 `pip install --user`）
+- 不受 macOS PEP 668 系统保护限制
+- 无需虚拟环境
 
 **手动安装（可选）**：
 
-```bash
-# 创建全局虚拟环境
-python3 -m venv ~/.claude/venvs/docugenius-converter
-source ~/.claude/venvs/docugenius-converter/bin/activate
+如果自动安装失败，可以手动安装：
 
-# 安装 Python 依赖
-pip install -r requirements.txt
+```bash
+# Python 依赖
+pip install --user python-docx openpyxl python-pptx pdfplumber
 
 # 可选：Markdown → Word 功能需要 Node.js
 cd scripts/md_to_docx
@@ -130,11 +118,11 @@ npm install
 当你在 Claude Code 中请求处理文档时：
 
 1. **检测需求**：Claude 识别到需要处理 Office/PDF/Markdown 文件
-2. **调用转换脚本**：运行 `python scripts/convert_document.py`
+2. **调用转换脚本**：运行 `./convert.sh` 或 `python scripts/convert_document.py`
 3. **自动处理**：
    - 检测 Python 环境
    - 验证文件格式
-   - 检查所需依赖（按需检查）
+   - 自动安装缺失的依赖（到用户目录，无需虚拟环境）
    - 执行转换
 4. **返回结果**：返回 JSON 格式的转换结果，包含 Markdown 内容和输出路径
 5. **后续处理**：Claude 分析转换后的内容，回答你的问题
@@ -169,13 +157,10 @@ your-project/
 
 ### 依赖缺失怎么办？
 
-Skill 会自动检测依赖，如果缺失会提示安装命令：
+Skill 会自动检测并安装依赖，如果自动安装失败，可手动安装：
 
 ```bash
-pip install python-docx    # Word
-pip install openpyxl       # Excel
-pip install python-pptx    # PowerPoint
-pip install pdfplumber     # PDF
+pip install --user python-docx openpyxl python-pptx pdfplumber
 ```
 
 ### 文件过大怎么办？
@@ -202,20 +187,19 @@ npm install
 ```
 docugenius-converter-skill/
 ├── SKILL.md                 # Claude Code Skill 定义
-├── install.sh               # 安装脚本 (macOS/Linux)
-├── install.bat              # 安装脚本 (Windows)
 ├── convert.sh               # 便捷运行脚本 (macOS/Linux)
 ├── convert.bat              # 便捷运行脚本 (Windows)
-├── requirements.txt         # Python 依赖
+├── requirements.txt         # Python 依赖（参考）
 ├── scripts/
-│   ├── convert_document.py  # 转换脚本核心
+│   ├── convert_document.py  # 转换脚本核心（支持自动安装依赖）
 │   └── md_to_docx/         # Markdown → Word 模块
 ├── references/
 │   └── supported-formats.md # 格式支持详情
 └── tests/                   # 测试文件
 
-全局虚拟环境（安装后创建）:
-~/.claude/venvs/docugenius-converter/  # 所有项目共享
+依赖安装位置（自动）:
+~/.local/lib/python*/site-packages/  # Linux/macOS
+%APPDATA%\Python\Python*\site-packages\  # Windows
 ```
 
 ## 技术细节

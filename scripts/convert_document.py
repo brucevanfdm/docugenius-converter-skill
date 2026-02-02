@@ -227,9 +227,73 @@ def save_dependency_cache(cache_data):
     except Exception:
         pass  # 缓存保存失败不影响主流程
 
+# ==================== 依赖安装函数 ====================
+
+def install_dependencies(pip_packages):
+    """
+    自动安装缺失的依赖到用户目录（使用 --user 标志）
+
+    使用 --user 安装的好处：
+    - 不受 PEP 668 系统保护限制（适用于 macOS 从系统 Python 安装）
+    - 无需虚拟环境
+    - 安装到 ~/.local/ (Linux/macOS) 或 %APPDATA% (Windows)
+    - 所有项目共享
+
+    Args:
+        pip_packages: 要安装的包名列表
+
+    Returns:
+        (success: bool, error_message: str or None)
+    """
+    if not pip_packages:
+        return True, None
+
+    # 获取当前 Python 可执行文件路径
+    python_exe = sys.executable or 'python'
+
+    # 构建安装命令
+    # 使用 --user 安装到用户目录，避免 PEP 668 限制
+    cmd = [python_exe, '-m', 'pip', 'install', '--user'] + pip_packages
+
+    try:
+        # 显示安装提示（仅在首次安装时）
+        print(f"[DocuGenius] 正在安装缺失的依赖: {', '.join(pip_packages)}", file=sys.stderr)
+        print(f"[DocuGenius] 安装位置: 用户目录 (不受系统保护限制)", file=sys.stderr)
+
+        # 运行安装命令
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            # 不使用 encoding 参数，让 subprocess 使用系统默认
+        )
+
+        if result.returncode == 0:
+            print(f"[DocuGenius] 依赖安装成功！", file=sys.stderr)
+            return True, None
+        else:
+            # 检查是否是权限问题
+            if "Permission denied" in result.stderr or "Access denied" in result.stderr:
+                return False, f"权限不足。请尝试: pip install --user {' '.join(pip_packages)}"
+
+            # 检查是否是 pip 不存在
+            if "No module named pip" in result.stderr:
+                return False, "pip 未安装。请先安装 pip: python -m ensurepip --upgrade"
+
+            # 其他错误
+            error_detail = result.stderr.strip() or result.stdout.strip()
+            return False, f"依赖安装失败: {error_detail}"
+
+    except FileNotFoundError:
+        return False, f"找不到 Python 解释器: {python_exe}"
+    except Exception as e:
+        return False, f"依赖安装时发生错误: {str(e)}"
+
+
 # ==================== 依赖检查函数 ====================
 
-def check_dependencies(file_ext=None):
+def check_dependencies(file_ext=None, auto_install=True):
     """
     检查必需的依赖是否已安装（默认检查全部；传入 file_ext 时仅检查该格式所需）
 
@@ -238,6 +302,13 @@ def check_dependencies(file_ext=None):
       - 若无法识别项目根目录或无权限写入，则回退到用户级缓存目录（Windows: %LOCALAPPDATA%/docugenius-converter）
     - 缓存有效期：永不过期（仅在 requirements.txt 变更时失效）
     - 缓存失效：requirements.txt 变更时自动失效，或手动清除缓存
+
+    Args:
+        file_ext: 文件扩展名（如 '.docx'），仅检查该格式所需的依赖
+        auto_install: 是否自动安装缺失的依赖（默认 True）
+
+    Returns:
+        (success: bool, error_message: str or None)
     """
     # 确定需要检查的依赖
     deps = _DEPENDENCIES_BY_EXT.get(file_ext) if file_ext else [
@@ -266,23 +337,56 @@ def check_dependencies(file_ext=None):
             cached_result = cached_deps[cache_key]
             if cached_result.get('all_installed'):
                 return True, None
-            else:
-                missing = cached_result.get('missing', [])
-                return False, f"缺少依赖库: {', '.join(missing)}。请运行: pip install {' '.join(missing)}"
+            # 缓存显示有缺失依赖，但不清除缓存（因为可能会自动安装）
 
-    # 缓存未命中，执行实际检查
+    # 缓存未命中或缓存显示有缺失，执行实际检查
     missing = []
+    missing_pip_names = []
     for module_name, pip_name in deps:
         try:
             importlib.import_module(module_name)
         except ImportError:
-            missing.append(pip_name)
+            missing.append(module_name)
+            missing_pip_names.append(pip_name)
+
+    # 如果有缺失依赖且启用了自动安装
+    if missing and auto_install:
+        success, error = install_dependencies(missing_pip_names)
+        if success:
+            # 安装成功，重新检查（清空缓存以确保使用新安装的包）
+            clear_cache()
+
+            # 重新导入检查
+            still_missing = []
+            for module_name, pip_name in deps:
+                try:
+                    importlib.import_module(module_name)
+                except ImportError:
+                    still_missing.append(pip_name)
+
+            if still_missing:
+                # 安装后仍然缺失
+                result = {'all_installed': False, 'missing': still_missing}
+                cache = cache or {'dependencies': {}}
+                cache['dependencies'][cache_key] = result
+                save_dependency_cache(cache)
+                return False, f"依赖安装后仍无法加载: {', '.join(still_missing)}。请手动安装并检查 Python 环境。"
+
+            # 全部成功
+            result = {'all_installed': True, 'missing': []}
+            cache = cache or {'dependencies': {}}
+            cache['dependencies'][cache_key] = result
+            save_dependency_cache(cache)
+            return True, None
+        else:
+            # 安装失败
+            return False, error
 
     # 构建结果
     if missing:
         result = {
             'all_installed': False,
-            'missing': missing
+            'missing': missing_pip_names
         }
     else:
         result = {
@@ -296,7 +400,7 @@ def check_dependencies(file_ext=None):
     save_dependency_cache(cache)
 
     if missing:
-        return False, f"缺少依赖库: {', '.join(missing)}。请运行: pip install {' '.join(missing)}"
+        return False, f"缺少依赖库: {', '.join(missing_pip_names)}。请运行: pip install --user {' '.join(missing_pip_names)}"
 
     return True, None
 
