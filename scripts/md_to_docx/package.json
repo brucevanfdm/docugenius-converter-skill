@@ -1,0 +1,14 @@
+{
+  "name": "md-to-docx",
+  "version": "1.0.0",
+  "description": "Markdown to DOCX converter for docugenius-converter-skill",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node index.js"
+  },
+  "dependencies": {
+    "docx": "^9.5.1",
+    "jsdom": "^24.0.0"
+  }
+}

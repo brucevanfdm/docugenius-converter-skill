@@ -4,7 +4,9 @@
 echo "正在安装 DocuGenius Converter 依赖..."
 echo ""
 
-# 检查 Python 是否安装
+# ========== Python 环境检查 ==========
+echo "[1/2] 检查 Python 环境..."
+
 if ! command -v python3 &> /dev/null && ! command -v python &> /dev/null; then
     echo "错误: 未找到 Python。请先安装 Python 3.6 或更高版本。"
     echo ""
@@ -46,18 +48,62 @@ fi
 echo "✓ Python 版本符合要求"
 echo ""
 
-# 安装依赖
-echo "正在安装依赖库..."
+# 安装 Python 依赖
+echo "正在安装 Python 依赖库..."
 $PYTHON_CMD -m pip install -r requirements.txt
 
-if [ $? -eq 0 ]; then
+if [ $? -ne 0 ]; then
     echo ""
-    echo "✓ 依赖安装成功！"
-    echo ""
-    echo "现在可以使用转换脚本了："
-    echo "  $PYTHON_CMD scripts/convert_document.py <file_path>"
-else
-    echo ""
-    echo "✗ 依赖安装失败。请检查错误信息。"
+    echo "✗ Python 依赖安装失败。请检查错误信息。"
     exit 1
 fi
+
+echo "✓ Python 依赖安装成功！"
+echo ""
+
+# ========== Node.js 环境检查（用于 Markdown 转 DOCX）==========
+echo "[2/2] 检查 Node.js 环境（用于 Markdown 转 DOCX）..."
+
+if ! command -v node &> /dev/null; then
+    echo ""
+    echo "警告: 未找到 Node.js。Markdown 转 DOCX 功能将不可用。"
+    echo "如需此功能，请安装 Node.js:"
+    echo "  macOS:   brew install node"
+    echo "  Ubuntu:  sudo apt install nodejs npm"
+    echo "  其他:    https://nodejs.org/"
+    echo ""
+    echo "其他功能（Office/PDF 转 Markdown）可正常使用。"
+else
+    echo "检测到 Node.js:"
+    node --version
+    echo ""
+
+    # 安装 Node.js 依赖
+    echo "正在安装 Node.js 依赖..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/scripts/md_to_docx"
+    npm install
+
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "✗ Node.js 依赖安装失败。Markdown 转 DOCX 功能将不可用。"
+        echo "请手动在 scripts/md_to_docx 目录下运行: npm install"
+    else
+        echo "✓ Node.js 依赖安装成功！"
+    fi
+
+    cd "$SCRIPT_DIR"
+fi
+
+echo ""
+echo "========================================"
+echo "安装完成！"
+echo "========================================"
+echo ""
+echo "支持的转换:"
+echo "  - Office/PDF 转 Markdown: .docx, .xlsx, .pptx, .pdf"
+echo "  - Markdown 转 Word: .md (需要 Node.js)"
+echo ""
+echo "使用方法:"
+echo "  $PYTHON_CMD scripts/convert_document.py <file_path>"
+echo ""

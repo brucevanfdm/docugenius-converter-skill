@@ -2,13 +2,15 @@
 # -*- coding: utf-8 -*-
 """
 独立的文档转换脚本
-将 Word、Excel、PowerPoint 和 PDF 文件转换为 Markdown 格式
+- 将 Word、Excel、PowerPoint 和 PDF 文件转换为 Markdown 格式
+- 将 Markdown 文件转换为 Word (.docx) 格式
 
 依赖：
 - python-docx: pip install python-docx
 - openpyxl: pip install openpyxl
 - python-pptx: pip install python-pptx
 - pdfplumber: pip install pdfplumber
+- Node.js: 用于 Markdown 转 DOCX（需要单独安装）
 """
 
 import sys
@@ -16,6 +18,8 @@ import os
 import json
 import importlib
 import re
+import subprocess
+import shutil
 
 # 确保 Windows 上使用 UTF-8 编码
 if sys.platform == 'win32':
@@ -32,6 +36,7 @@ _DEPENDENCIES_BY_EXT = {
     '.xlsx': [('openpyxl', 'openpyxl')],
     '.pptx': [('pptx', 'python-pptx')],
     '.pdf': [('pdfplumber', 'pdfplumber')],
+    '.md': [],  # Markdown 转 DOCX 使用 Node.js，无 Python 依赖
 }
 
 def check_dependencies(file_ext=None):
@@ -382,6 +387,85 @@ def convert_pdf(file_path):
 
     return content.strip()
 
+def convert_md(file_path, output_dir=None):
+    """
+    将 Markdown 文件转换为 DOCX 格式（通过 Node.js 脚本）
+
+    Args:
+        file_path: Markdown 文件路径
+        output_dir: 可选的输出目录
+
+    Returns:
+        包含 'success'、'output_path' 和可选 'error' 的字典
+    """
+    # 检查 Node.js 是否可用
+    node_cmd = shutil.which('node')
+    if not node_cmd:
+        return {
+            'success': False,
+            'error': '未找到 Node.js。Markdown 转 DOCX 需要 Node.js 环境。请安装 Node.js: https://nodejs.org/'
+        }
+
+    # 获取 Node.js 脚本路径
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    node_script = os.path.join(script_dir, 'md_to_docx', 'index.js')
+
+    if not os.path.exists(node_script):
+        return {
+            'success': False,
+            'error': f'Node.js 转换脚本不存在: {node_script}。请运行 npm install 安装依赖。'
+        }
+
+    # 检查 node_modules 是否存在
+    node_modules = os.path.join(script_dir, 'md_to_docx', 'node_modules')
+    if not os.path.exists(node_modules):
+        return {
+            'success': False,
+            'error': f'Node.js 依赖未安装。请在 {os.path.join(script_dir, "md_to_docx")} 目录下运行: npm install'
+        }
+
+    try:
+        # 调用 Node.js 脚本
+        cmd = [node_cmd, node_script, file_path]
+        if output_dir:
+            cmd.append(output_dir)
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            timeout=120  # 2分钟超时
+        )
+
+        # 解析输出
+        try:
+            output = json.loads(result.stdout)
+            return output
+        except json.JSONDecodeError:
+            if result.returncode == 0:
+                return {
+                    'success': True,
+                    'output_path': result.stdout.strip(),
+                    'message': '转换成功'
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Node.js 脚本输出解析失败: {result.stdout}\n{result.stderr}'
+                }
+
+    except subprocess.TimeoutExpired:
+        return {
+            'success': False,
+            'error': '转换超时（超过2分钟）'
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'调用 Node.js 脚本失败: {str(e)}'
+        }
+
 def convert_document(file_path, extract_images=True, output_dir=None):
     """
     将文档转换为 Markdown 格式
@@ -418,13 +502,17 @@ def convert_document(file_path, extract_images=True, output_dir=None):
         }
 
     # 检查文件扩展名
-    supported_extensions = ['.docx', '.xlsx', '.pptx', '.pdf']
+    supported_extensions = ['.docx', '.xlsx', '.pptx', '.pdf', '.md']
     file_ext = os.path.splitext(file_path)[1].lower()
     if file_ext not in supported_extensions:
         return {
             'success': False,
             'error': f'不支持的文件格式: {file_ext}。支持的格式: {", ".join(supported_extensions)}'
         }
+
+    # Markdown 转 DOCX 使用单独的处理流程
+    if file_ext == '.md':
+        return convert_md(file_path, output_dir)
 
     # 检查依赖（按格式按需检查，避免无关依赖阻塞）
     deps_ok, error_msg = check_dependencies(file_ext)
@@ -510,7 +598,7 @@ def batch_convert(directory, recursive=True, extract_images=True, output_dir=Non
     Returns:
         转换结果列表
     """
-    supported_extensions = ['.docx', '.xlsx', '.pptx', '.pdf']
+    supported_extensions = ['.docx', '.xlsx', '.pptx', '.pdf', '.md']
     results = []
 
     if recursive:
@@ -543,6 +631,10 @@ def main():
         print('  file_path: 文档文件路径')
         print('  extract_images: true/false (默认: true，当前版本暂不支持)')
         print('  output_dir: 可选的输出目录')
+        print('')
+        print('支持的格式:')
+        print('  - Office/PDF 转 Markdown: .docx, .xlsx, .pptx, .pdf')
+        print('  - Markdown 转 Word: .md')
         print('')
         print('批量转换: python convert_document.py --batch <directory> [recursive]')
         print('  directory: 要扫描的目录')

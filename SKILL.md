@@ -1,15 +1,27 @@
 ---
 name: docugenius-converter
-description: 文档转换工具，将 Word (.docx)、Excel (.xlsx)、PowerPoint (.pptx) 和 PDF (.pdf) 转换为 Markdown 格式。当用户请求转换文档、需要分析文档内容（"分析这个 Word"、"读取这个 PDF"）、或批量处理文档时使用。
+description: 双向文档转换工具。将 Word (.docx)、Excel (.xlsx)、PowerPoint (.pptx) 和 PDF (.pdf) 转换为 Markdown 格式；将 Markdown (.md) 转换为 Word (.docx) 格式。当用户请求转换文档、需要分析文档内容、或批量处理文档时使用。
 ---
 
 # DocuGenius Document Converter
 
-独立的文档转换工具，将 Office 文档和 PDF 转换为 AI 友好的 Markdown 格式。
+双向文档转换工具：
+- **Office/PDF → Markdown**：将 Office 文档和 PDF 转换为 AI 友好的 Markdown 格式
+- **Markdown → Word**：将 Markdown 文件转换为专业的 Word 文档
+
+## 环境要求
+
+### Python 环境（必需）
+
+此 skill 依赖 Python 3.6+，用于 Office/PDF 转 Markdown 功能。
+
+### Node.js 环境（可选）
+
+Markdown 转 Word 功能需要 Node.js 环境。如果不需要此功能，可以跳过 Node.js 安装。
 
 ## Python 环境检测与引导（Claude 操作指南）
 
-**重要**：此 skill 依赖 Python 3.6+。在执行转换前，你必须先检测用户的 Python 环境。
+**重要**：在执行转换前，你必须先检测用户的 Python 环境。
 
 ### 自动检测流程
 
@@ -169,7 +181,8 @@ python -m pip install -r requirements.txt
 ### 3. 验证文件
 
 检查文件是否存在且格式受支持：
-- **支持**: `.docx`, `.xlsx`, `.pptx`, `.pdf`
+- **Office/PDF 转 Markdown**: `.docx`, `.xlsx`, `.pptx`, `.pdf`
+- **Markdown 转 Word**: `.md`
 - **不支持**: `.doc`, `.xls`, `.ppt`（旧格式 - 需先转换）
 
 ### 4. 转换文档
@@ -182,8 +195,12 @@ python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 
 参数：
 - `file_path`: 文档路径（必需）
-- `extract_images`: `true` 或 `false`（默认: `true`，**注意：当前版本此参数保留供未来使用，暂不影响转换结果**）
-- `output_dir`: 可选的输出目录（默认: 同目录下的 `Markdown/` 子目录）
+- `extract_images`: `true` 或 `false`（默认: `true`，仅用于 Office/PDF 转换）
+- `output_dir`: 可选的输出目录
+  - Office/PDF → Markdown: 默认为 `Markdown/` 子目录
+  - Markdown → Word: 默认为 `Word/` 子目录
+
+**注意**：Markdown 转 Word 功能需要 Node.js 环境。如果未安装 Node.js，转换时会提示错误。
 
 ### 5. 处理结果
 
@@ -202,7 +219,7 @@ python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 
 ## 常见模式
 
-### 模式 1: 单文件转换
+### 模式 1: Office/PDF 转 Markdown
 
 用户："把这个 Word 文档转换成 Markdown"
 
@@ -215,7 +232,34 @@ if result['success']:
     # 现在可以分析或处理内容
 ```
 
-### 模式 2: 分析文档内容
+### 模式 2: Markdown 转 Word
+
+用户："把这个 Markdown 文件转换成 Word 文档"
+
+```python
+result = convert_document('/path/to/document.md')
+if result['success']:
+    print(f"转换成功: {result['output_path']}")
+else:
+    # 检查是否是 Node.js 环境问题
+    if 'Node.js' in result['error']:
+        print("需要安装 Node.js 才能使用 Markdown 转 Word 功能")
+```
+
+### 模式 3: 分析文档内容
+
+用户："把这个 Word 文档转换成 Markdown"
+
+```python
+result = convert_document('/path/to/report.docx')
+if result['success']:
+    # 读取并使用 markdown 内容
+    with open(result['output_path'], 'r', encoding='utf-8') as f:
+        content = f.read()
+    # 现在可以分析或处理内容
+```
+
+### 模式 3: 分析文档内容
 
 用户："这个 PDF 的主要内容是什么？"
 
@@ -229,7 +273,21 @@ if result['success']:
     # ... 你的分析逻辑 ...
 ```
 
-### 模式 3: 批量处理
+### 模式 4: 批量处理
+
+用户："这个 PDF 的主要内容是什么？"
+
+```python
+# 首先转换
+result = convert_document('/path/to/document.pdf')
+if result['success']:
+    # 直接使用 markdown 内容
+    content = result['markdown_content']
+    # 分析和总结
+    # ... 你的分析逻辑 ...
+```
+
+### 模式 4: 批量处理
 
 用户："转换这个文件夹里的所有文档"
 
@@ -238,7 +296,7 @@ import os
 from pathlib import Path
 
 folder = '/path/to/documents'
-supported_exts = ['.docx', '.xlsx', '.pptx', '.pdf']
+supported_exts = ['.docx', '.xlsx', '.pptx', '.pdf', '.md']
 
 for file in Path(folder).rglob('*'):
     if file.suffix.lower() in supported_exts:
@@ -257,7 +315,7 @@ python scripts/convert_document.py --batch /path/to/documents
 
 ## 依赖库
 
-此 skill 使用以下轻量级 Python 库：
+### Python 依赖（Office/PDF 转 Markdown）
 
 - **python-docx**: 处理 Word 文档
 - **openpyxl**: 处理 Excel 文件
@@ -266,15 +324,27 @@ python scripts/convert_document.py --batch /path/to/documents
 
 所有依赖都很轻量，总大小约 10-15MB。
 
+### Node.js 依赖（Markdown 转 Word）
+
+- **docx**: DOCX 文档生成库
+- **jsdom**: 提供 DOM 环境支持
+
+总大小约 20-30MB。
+
 ## 支持的格式
 
 详细的格式支持信息请参见 [supported-formats.md](references/supported-formats.md)。
 
 快速参考：
+
+**Office/PDF → Markdown:**
 - **Word (.docx)**: 文本、标题（Heading 1-6）、列表、表格、格式（粗体/斜体） - 质量优秀
 - **Excel (.xlsx)**: 表格、多工作表 - 质量优秀
 - **PowerPoint (.pptx)**: 幻灯片文本 - 质量良好
 - **PDF (.pdf)**: 文本、表格 - 质量取决于 PDF 类型
+
+**Markdown → Word:**
+- **Markdown (.md)**: 标题（H1-H6）、列表（有序/无序）、表格、代码块、粗体/斜体、引用块、链接、图片占位符 - 质量优秀
 
 ## 安全性特性
 
@@ -546,6 +616,7 @@ Claude 操作流程：
 
 ## 系统要求
 
-- **Python**: 3.6 或更高版本
+- **Python**: 3.6 或更高版本（必需）
+- **Node.js**: 14.0 或更高版本（可选，仅用于 Markdown 转 Word）
 - **操作系统**: Windows、macOS、Linux
-- **磁盘空间**: 约 20MB（包括依赖）
+- **磁盘空间**: 约 50MB（包括所有依赖）
