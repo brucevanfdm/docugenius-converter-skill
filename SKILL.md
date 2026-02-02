@@ -7,68 +7,86 @@ description: 文档转换工具，将 Word (.docx)、Excel (.xlsx)、PowerPoint 
 
 独立的文档转换工具，将 Office 文档和 PDF 转换为 AI 友好的 Markdown 格式。
 
-## 前置要求：Python 环境
+## Python 环境检测与引导（Claude 操作指南）
 
-此工具需要 Python 3.6 或更高版本。
+**重要**：此 skill 依赖 Python 3.6+。在执行转换前，你必须先检测用户的 Python 环境。
 
-### 检查 Python 是否已安装
+### 自动检测流程
 
-**Windows:**
+使用 Bash 工具检测 Python 环境：
+
 ```bash
+# Windows 用户
 python --version
-```
 
-**macOS/Linux:**
-```bash
+# macOS/Linux 用户
 python3 --version
 ```
 
-如果显示版本号（如 `Python 3.8.10`）且版本 >= 3.6，说明已安装，可以跳过安装步骤。
+### 处理不同情况
 
-### 安装 Python
+**情况 1：Python 未安装**
 
-如果未安装 Python 或版本过低，请按照以下步骤安装：
+如果命令失败（command not found 或类似错误），告知用户：
 
-**Windows:**
-1. 访问 [Python 官网](https://www.python.org/downloads/)
-2. 下载最新的 Python 3.x 版本（推荐 3.8 或更高）
-3. 运行安装程序
-4. **重要**：勾选 "Add Python to PATH" 选项
-5. 点击 "Install Now"
-6. 安装完成后，打开新的命令提示符窗口，运行 `python --version` 验证
+```
+您的系统未安装 Python。此工具需要 Python 3.6 或更高版本。
 
-**macOS:**
-```bash
-# 使用 Homebrew（推荐）
+请按照以下步骤安装：
+
+Windows:
+1. 访问 https://www.python.org/downloads/
+2. 下载并运行安装程序
+3. 重要：勾选 "Add Python to PATH" 选项
+4. 安装完成后重启终端
+
+macOS:
 brew install python3
 
-# 或访问官网下载安装包
-# https://www.python.org/downloads/macos/
+Linux (Ubuntu/Debian):
+sudo apt update && sudo apt install python3 python3-pip
+
+安装完成后，请告诉我，我会继续帮您完成文档转换。
 ```
 
-**Linux (Ubuntu/Debian):**
+**情况 2：Python 版本过低**
+
+检测版本是否 >= 3.6：
+
 ```bash
-sudo apt update
-sudo apt install python3 python3-pip
+python -c "import sys; print(sys.version_info >= (3, 6))"
 ```
 
-**Linux (CentOS/RHEL):**
+如果返回 False，告知用户需要升级。
+
+**情况 3：Python 已安装且版本符合**
+
+继续执行依赖安装流程：
+
+1. 引导用户运行安装脚本：
+   - Windows: `install.bat`
+   - macOS/Linux: `./install.sh`
+
+2. 或使用 Bash 工具直接安装：
+   ```bash
+   python -m pip install -r requirements.txt
+   ```
+
+3. 如果安装失败，检查错误信息并引导用户解决
+
+### 依赖库缺失处理
+
+如果转换脚本报错"缺少依赖库"，使用 Bash 工具安装对应的库：
+
 ```bash
-sudo yum install python3 python3-pip
-```
+# 按需安装（推荐）
+pip install python-docx  # Word 文档
+pip install openpyxl     # Excel 文件
+pip install python-pptx  # PowerPoint 文件
+pip install pdfplumber   # PDF 文件
 
-### 验证安装
-
-安装完成后，验证 Python 和 pip 是否可用：
-
-```bash
-# Windows
-python --version
-python -m pip --version
-
-# macOS/Linux
-python3 --version
-python3 -m pip --version
+# 或安装全部
+pip install -r requirements.txt
 ```
 
 ## 快速开始
@@ -118,38 +136,35 @@ else:
 - 用户请求批量处理多个文档
 - 用户需要将文档内容用于后续的AI处理
 
-### 2. 检查 Python 环境
+### 2. 检查 Python 环境（自动化）
 
-在执行转换前，确保用户已安装 Python：
+**你必须使用 Bash 工具自动检测 Python 环境**，不要让用户手动检查。
 
-**检查方法：**
+**步骤 1：检测 Python 是否存在**
+
 ```bash
-# Windows
-python --version
-
-# macOS/Linux
-python3 --version
+# 根据用户操作系统选择命令
+# Windows: python --version
+# macOS/Linux: python3 --version
 ```
 
-**如果 Python 未安装或版本过低：**
-1. 告知用户需要 Python 3.6 或更高版本
-2. 引导用户查看 skill.md 中的"前置要求：Python 环境"章节
-3. 提供快速安装链接：
-   - Windows: https://www.python.org/downloads/
-   - macOS: `brew install python3`
-   - Linux: `sudo apt install python3 python3-pip`
+**步骤 2：根据检测结果采取行动**
 
-**如果 Python 已安装但依赖库缺失：**
-1. 引导用户运行安装脚本：
-   - Windows: `install.bat`
-   - macOS/Linux: `./install.sh`
-2. 或手动安装：`pip install -r requirements.txt`
+- **如果命令成功**：继续步骤 3 验证文件
+- **如果命令失败**：告知用户并提供安装指引（参考"Python 环境检测与引导"章节）
 
-### 3. 验证文件
+**步骤 3：处理依赖库缺失**
 
-检查文件是否存在且格式受支持：
-- **支持**: `.docx`, `.xlsx`, `.pptx`, `.pdf`
-- **不支持**: `.doc`, `.xls`, `.ppt`（旧格式 - 需先转换）
+如果转换时报错"缺少依赖库"，使用 Bash 工具安装：
+
+```bash
+# 推荐：引导用户运行安装脚本
+# Windows: install.bat
+# macOS/Linux: ./install.sh
+
+# 或直接安装
+python -m pip install -r requirements.txt
+```
 
 ### 3. 验证文件
 
@@ -451,33 +466,82 @@ Heading 2: 主要发现
 7. **检查输出质量**: 转换后建议检查输出质量，必要时手动调整
 8. **批量处理**: 使用批量转换模式处理多个文件，提高效率
 
-## 完整示例
+## 完整示例（Claude Code 工作流程）
 
-```python
-# 用户问："分析这个 Excel 文件中的数据"
+### 示例 1：用户请求分析文档（Python 已安装）
 
-# 步骤 1: 转换 Excel 文件
-result = convert_document(
-    file_path='/path/to/data.xlsx'
-)
+```
+用户："分析这个 Excel 文件中的数据：/path/to/data.xlsx"
 
-# 步骤 2: 检查转换是否成功
-if not result['success']:
-    print(f"转换失败: {result['error']}")
-    # 询问用户检查文件或安装依赖
-    exit(1)
+Claude 操作流程：
 
-# 步骤 3: 使用转换后的内容
-markdown_content = result['markdown_content']
+1. 检测到文档分析需求，触发此 skill
 
-# 步骤 4: 分析数据
-# Excel 表格现在是 Markdown 表格格式
-# 你可以解析和分析它们
+2. 使用 Bash 工具检查 Python 环境：
+   bash: python --version
+   输出: Python 3.9.0
 
-# 步骤 5: 通知用户
-print(f"已将 Excel 文件转换为: {result['output_path']}")
-print("分析结果:")
-# ... 显示你的分析 ...
+3. Python 已安装，直接转换文档：
+   bash: python scripts/convert_document.py /path/to/data.xlsx
+
+4. 转换成功，读取 Markdown 内容并分析
+
+5. 向用户展示分析结果
+```
+
+### 示例 2：用户请求转换文档（Python 未安装）
+
+```
+用户："把这个 Word 文档转换成 Markdown：report.docx"
+
+Claude 操作流程：
+
+1. 检测到文档转换需求，触发此 skill
+
+2. 使用 Bash 工具检查 Python 环境：
+   bash: python --version
+   错误: 'python' 不是内部或外部命令
+
+3. Python 未安装，告知用户：
+
+   "您的系统未安装 Python。此工具需要 Python 3.6 或更高版本。
+
+   请按照以下步骤安装：
+
+   Windows:
+   1. 访问 https://www.python.org/downloads/
+   2. 下载并运行安装程序
+   3. 重要：勾选 'Add Python to PATH' 选项
+   4. 安装完成后重启终端
+
+   安装完成后，请告诉我，我会继续帮您完成文档转换。"
+
+4. 等待用户安装 Python 后继续
+```
+
+### 示例 3：Python 已安装但依赖库缺失
+
+```
+用户："转换这个 PDF：document.pdf"
+
+Claude 操作流程：
+
+1. 检测到文档转换需求，触发此 skill
+
+2. 使用 Bash 工具检查 Python 环境：
+   bash: python --version
+   输出: Python 3.9.0
+
+3. Python 已安装，尝试转换：
+   bash: python scripts/convert_document.py document.pdf
+   错误: 缺少依赖库: pdfplumber
+
+4. 依赖库缺失，使用 Bash 工具安装：
+   bash: python -m pip install pdfplumber
+
+5. 安装成功，重新转换文档
+
+6. 转换成功，向用户展示结果
 ```
 
 ## 系统要求
