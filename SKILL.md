@@ -53,11 +53,17 @@ python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 - `extract_images`: `true`/`false`（默认 `true`，仅用于 Office/PDF）
 - `output_dir`: 输出目录（可选，不指定时使用默认位置）
 
+**自动依赖检测**：
+- **首次转换**：脚本会自动检测所需依赖库是否已安装
+- **缓存机制**：检测结果会缓存到 `.claude/cache/docugenius-converter/`，后续转换直接使用缓存，无需重复检测
+- **缺少依赖**：如果缺少依赖，脚本会返回错误信息，提示用户安装
+- **安装依赖**：根据错误提示运行 `pip install <缺失的库>`，或使用安装脚本
+
 **默认输出目录**（不指定 `output_dir` 时）：
 - **Office/PDF → Markdown**: 文件同级目录下的 `Markdown/` 文件夹
   - 例如：`/path/to/document.docx` → `/path/to/Markdown/document.md`
 - **Markdown → Word**: 文件同级目录下的 `Word/` 文件夹
-  - 例如：`/path/to/document.md` → `/path/to/Word/document.docx`
+  - 例如：`/path/to/document.md` → `/path/to/Word/document.docx``
 
 ### 4. 处理转换结果
 

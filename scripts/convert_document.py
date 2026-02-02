@@ -107,13 +107,49 @@ _DEPENDENCIES_BY_EXT = {
 
 # ==================== 缓存管理函数 ====================
 
+def _find_project_root(start_dir: Path):
+    """
+    从给定目录开始向上查找项目根目录。
+
+    判定依据（任一命中即可）：
+    - SKILL.md（本仓库特征文件）
+    - requirements.txt
+    - .git（开发态仓库）
+    """
+    try:
+        current = start_dir.resolve()
+    except Exception:
+        current = start_dir
+
+    candidates = [current, *list(getattr(current, "parents", []))]
+    for candidate in candidates:
+        try:
+            if (
+                (candidate / 'SKILL.md').exists()
+                or (candidate / 'requirements.txt').exists()
+                or (candidate / '.git').exists()
+            ):
+                return candidate
+        except Exception:
+            continue
+    return None
+
 def get_cache_dir():
     """获取项目级缓存目录"""
-    # 从当前工作目录开始，向上查找项目根目录
-    current = Path.cwd()
+    # 优先从当前工作目录向上找项目根目录；否则回退到脚本所在目录向上找；
+    # 再不行（例如从系统目录运行），回退到用户级缓存目录，避免因权限问题导致缓存不可用。
+    project_root = _find_project_root(Path.cwd())
+    if project_root is None:
+        project_root = _find_project_root(Path(__file__).resolve().parent)
 
-    # 简单实现：使用当前工作目录下的 .claude/cache
-    cache_dir = current / '.claude' / 'cache' / 'docugenius-converter'
+    if project_root is not None:
+        cache_dir = project_root / '.claude' / 'cache' / 'docugenius-converter'
+    else:
+        if sys.platform == "win32":
+            base_dir = os.getenv("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+        else:
+            base_dir = os.getenv("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+        cache_dir = Path(base_dir) / 'docugenius-converter'
 
     # 创建缓存目录
     try:
@@ -127,9 +163,12 @@ def get_cache_dir():
 def get_requirements_hash():
     """计算 requirements.txt 的 hash，用于检测依赖变更"""
     try:
-        # 尝试找到 requirements.txt
-        script_dir = Path(__file__).parent.parent
-        req_file = script_dir / 'requirements.txt'
+        # 尝试找到 requirements.txt（按项目根目录判定，避免工作目录不同导致误判）
+        project_root = _find_project_root(Path(__file__).resolve().parent)
+        if project_root is None:
+            project_root = Path(__file__).resolve().parent.parent
+
+        req_file = project_root / 'requirements.txt'
 
         if not req_file.exists():
             return None
@@ -195,7 +234,8 @@ def check_dependencies(file_ext=None):
     检查必需的依赖是否已安装（默认检查全部；传入 file_ext 时仅检查该格式所需）
 
     使用项目级缓存提高性能：
-    - 缓存位置：<project>/.claude/cache/docugenius-converter/dependencies.json
+    - 缓存位置：优先 <project>/.claude/cache/docugenius-converter/dependencies.json
+      - 若无法识别项目根目录或无权限写入，则回退到用户级缓存目录（Windows: %LOCALAPPDATA%/docugenius-converter）
     - 缓存有效期：永不过期（仅在 requirements.txt 变更时失效）
     - 缓存失效：requirements.txt 变更时自动失效，或手动清除缓存
     """
