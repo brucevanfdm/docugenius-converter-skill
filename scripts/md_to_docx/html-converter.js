@@ -5,7 +5,7 @@
  */
 
 const { JSDOM } = require('jsdom');
-const { Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, VerticalAlign } = require('docx');
+const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, VerticalAlign } = require('docx');
 const { charsToTwips } = require('./styles');
 
 // Node 类型常量
@@ -63,19 +63,19 @@ function convertNode(node) {
       case 'H1':
         return new Paragraph({
           text: node.textContent,
-          heading: HeadingLevel.HEADING_1
+          style: "Heading1"
         });
 
       case 'H2':
         return new Paragraph({
           text: node.textContent,
-          heading: HeadingLevel.HEADING_2
+          style: "Heading2"
         });
 
       case 'H3':
         return new Paragraph({
           text: node.textContent,
-          heading: HeadingLevel.HEADING_3
+          style: "Heading3"
         });
 
       case 'H4':
@@ -83,7 +83,7 @@ function convertNode(node) {
       case 'H6':
         return new Paragraph({
           text: node.textContent,
-          heading: HeadingLevel.HEADING_3
+          style: "Heading3"
         });
 
       case 'P':
