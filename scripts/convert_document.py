@@ -20,20 +20,78 @@ import importlib
 import re
 import subprocess
 import shutil
+import io
 
 SUPPORTED_EXTENSIONS = ['.docx', '.xlsx', '.pptx', '.pdf', '.md']
 MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
 NODE_CONVERT_TIMEOUT_SECONDS = 120
 
-# 确保 Windows 上使用 UTF-8 编码
-if sys.platform == 'win32':
-    if hasattr(sys.stdout, 'reconfigure'):
+def _configure_windows_stdio():
+    """
+    Windows 控制台经常使用 GBK/CP936，直接输出某些符号（如 ✓/✗）会触发 UnicodeEncodeError。
+
+    策略：
+    - 交互式控制台（isatty=True）：不强制切换编码，尽量保持用户终端显示正常；仅将 errors 调整为 replace，避免崩溃。
+    - 非交互（被管道/测试框架捕获）：优先输出 UTF-8，保证机器可读；同样使用 errors=replace 兜底。
+    """
+    if sys.platform != "win32":
+        return
+
+    def _safe_reconfigure(stream, *, encoding=None, errors=None):
+        if not hasattr(stream, "reconfigure"):
+            return False
         try:
-            sys.stdout.reconfigure(encoding='utf-8')
-            sys.stderr.reconfigure(encoding='utf-8')
-        except Exception as e:
-            # 某些环境可能不支持 reconfigure，记录警告但继续执行
-            print(f"警告: 无法设置UTF-8编码: {e}", file=sys.stderr)
+            kwargs = {}
+            if encoding is not None:
+                kwargs["encoding"] = encoding
+            if errors is not None:
+                kwargs["errors"] = errors
+            stream.reconfigure(**kwargs)
+            return True
+        except Exception:
+            return False
+
+    def _safe_wrap(stream, *, encoding, errors):
+        buffer = None
+        if hasattr(stream, "detach"):
+            try:
+                buffer = stream.detach()
+            except Exception:
+                buffer = None
+        if buffer is None:
+            buffer = getattr(stream, "buffer", None)
+        if buffer is None:
+            return False
+        try:
+            wrapped = io.TextIOWrapper(buffer, encoding=encoding, errors=errors, line_buffering=True)
+            if stream is sys.stdout:
+                sys.stdout = wrapped
+            elif stream is sys.stderr:
+                sys.stderr = wrapped
+            return True
+        except Exception:
+            return False
+
+    is_tty = bool(getattr(sys.stdout, "isatty", lambda: False)())
+    errors = "replace"
+
+    if is_tty:
+        if not _safe_reconfigure(sys.stdout, errors=errors):
+            current_encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+            _safe_wrap(sys.stdout, encoding=current_encoding, errors=errors)
+        if not _safe_reconfigure(sys.stderr, errors=errors):
+            current_encoding = getattr(sys.stderr, "encoding", None) or "utf-8"
+            _safe_wrap(sys.stderr, encoding=current_encoding, errors=errors)
+        return
+
+    target_encoding = "utf-8"
+    if not _safe_reconfigure(sys.stdout, encoding=target_encoding, errors=errors):
+        _safe_wrap(sys.stdout, encoding=target_encoding, errors=errors)
+    if not _safe_reconfigure(sys.stderr, encoding=target_encoding, errors=errors):
+        _safe_wrap(sys.stderr, encoding=target_encoding, errors=errors)
+
+
+_configure_windows_stdio()
 
 _DEPENDENCIES_BY_EXT = {
     '.docx': [('docx', 'python-docx')],

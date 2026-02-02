@@ -33,7 +33,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo √ Python 版本符合要求
+echo [OK] Python 版本符合要求
 echo.
 
 REM 安装 Python 依赖
@@ -47,7 +47,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo √ Python 依赖安装成功！
+echo [OK] Python 依赖安装成功！
 echo.
 
 REM ========== Node.js 环境检查（用于 Markdown 转 DOCX）==========
@@ -74,14 +74,14 @@ call npm install
 
 if errorlevel 1 (
     echo.
-    echo × Node.js 依赖安装失败。Markdown 转 DOCX 功能将不可用。
+    echo [ERROR] Node.js 依赖安装失败。Markdown 转 DOCX 功能将不可用。
     echo 请手动在 scripts\md_to_docx 目录下运行: npm install
     cd ..\..
     goto :done
 )
 
 cd ..\..
-echo √ Node.js 依赖安装成功！
+echo [OK] Node.js 依赖安装成功！
 echo.
 
 :done

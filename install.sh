@@ -45,7 +45,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo "✓ Python 版本符合要求"
+echo "[OK] Python 版本符合要求"
 echo ""
 
 # 安装 Python 依赖
@@ -54,11 +54,11 @@ $PYTHON_CMD -m pip install -r requirements.txt
 
 if [ $? -ne 0 ]; then
     echo ""
-    echo "✗ Python 依赖安装失败。请检查错误信息。"
+    echo "[ERROR] Python 依赖安装失败。请检查错误信息。"
     exit 1
 fi
 
-echo "✓ Python 依赖安装成功！"
+echo "[OK] Python 依赖安装成功！"
 echo ""
 
 # ========== Node.js 环境检查（用于 Markdown 转 DOCX）==========
@@ -86,10 +86,10 @@ else
 
     if [ $? -ne 0 ]; then
         echo ""
-        echo "✗ Node.js 依赖安装失败。Markdown 转 DOCX 功能将不可用。"
+        echo "[ERROR] Node.js 依赖安装失败。Markdown 转 DOCX 功能将不可用。"
         echo "请手动在 scripts/md_to_docx 目录下运行: npm install"
     else
-        echo "✓ Node.js 依赖安装成功！"
+        echo "[OK] Node.js 依赖安装成功！"
     fi
 
     cd "$SCRIPT_DIR"
