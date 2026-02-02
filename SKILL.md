@@ -176,6 +176,41 @@ pip install pdfplumber   # PDF
 - **操作系统**: Windows、macOS、Linux
 - **磁盘空间**: 约 50MB
 
+## 缓存机制
+
+为提高性能，转换脚本使用项目级缓存存储依赖检测结果：
+
+### 缓存位置
+```
+<project-root>/.claude/cache/docugenius-converter/dependencies.json
+```
+
+### 缓存策略
+- **缓存有效期**: 永不过期（除非 requirements.txt 变更）
+- **自动失效**: 当 `requirements.txt` 变更时自动失效
+- **首次检测**: 首次转换时会检查依赖并缓存结果
+- **后续转换**: 直接使用缓存，无需重复检测
+
+### 清除缓存
+如需强制重新检测依赖（例如安装了新库），运行：
+```bash
+python scripts/convert_document.py --clear-cache
+```
+
+### 缓存数据结构
+```json
+{
+  "timestamp": 1738493544.123,
+  "requirements_hash": "abc123...",
+  "dependencies": {
+    "python-docx,openpyxl,pdfplumber": {
+      "all_installed": true,
+      "missing": []
+    }
+  }
+}
+```
+
 ## 输出目录说明
 
 转换后的文件默认保存在原文件同级目录下的专门文件夹中：
