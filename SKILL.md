@@ -7,7 +7,9 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 双向文档转换工具：
 
 - **Office/PDF → Markdown**：将 Office 文档和 PDF 转换为 AI 友好的 Markdown 格式
+  - 输出位置：文件同级目录下的 `Markdown/` 文件夹
 - **Markdown → Word**：将 Markdown 文件转换为专业的 Word 文档
+  - 输出位置：文件同级目录下的 `Word/` 文件夹
 
 ## 环境要求
 
@@ -48,8 +50,14 @@ python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 
 **参数说明**：
 - `file_path`: 文档路径（必需）
-- `extract_images`: `true`/`false`（默认 `true`）
-- `output_dir`: 输出目录（可选）
+- `extract_images`: `true`/`false`（默认 `true`，仅用于 Office/PDF）
+- `output_dir`: 输出目录（可选，不指定时使用默认位置）
+
+**默认输出目录**（不指定 `output_dir` 时）：
+- **Office/PDF → Markdown**: 文件同级目录下的 `Markdown/` 文件夹
+  - 例如：`/path/to/document.docx` → `/path/to/Markdown/document.md`
+- **Markdown → Word**: 文件同级目录下的 `Word/` 文件夹
+  - 例如：`/path/to/document.md` → `/path/to/Word/document.docx`
 
 ### 4. 处理转换结果
 
@@ -167,3 +175,27 @@ pip install pdfplumber   # PDF
 - **Node.js**: 14+（可选，仅 Markdown 转 Word）
 - **操作系统**: Windows、macOS、Linux
 - **磁盘空间**: 约 50MB
+
+## 输出目录说明
+
+转换后的文件默认保存在原文件同级目录下的专门文件夹中：
+
+### Office/PDF → Markdown
+```
+原文件目录/
+├── report.docx              # 原始文件
+└── Markdown/                # 输出目录
+    └── report.md            # 转换后的 Markdown
+```
+
+### Markdown → Word
+```
+原文件目录/
+├── document.md              # 原始文件
+└── Word/                    # 输出目录
+    └── document.docx        # 转换后的 Word 文档
+```
+
+**注意事项**：
+- 输出文件夹（`Markdown/` 或 `Word/`）会在不存在时自动创建
+- 如需指定其他输出位置，可在命令中添加 `output_dir` 参数
