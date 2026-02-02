@@ -1,11 +1,11 @@
 ---
 name: docugenius-converter
-description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、PowerPoint (.pptx) 和 PDF (.pdf) 转换为 AI 友好的 Markdown 格式，或将 Markdown (.md) 转换为 Word (.docx) 格式。当用户请求以下操作时使用：(1) 明确请求文档转换（"convert this document"、"转换文档"、"导出为Markdown"）；(2) 需要 AI 理解文档内容（"帮我分析这个 Word 文件"、"读取这个 PDF"、"总结这个 Excel"）；(3) 上传文档文件并询问内容（"这是什么"、"帮我看看"）；(4) 批量处理文档；(5) 将 Markdown 转换为 Word（"把这个 md 转成 docx"）。
+description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、PowerPoint (.pptx) 和 PDF (.pdf) 转换为 AI 友好的 Markdown 格式，或将 Markdown (.md) 转换为 Word (.docx) 格式。当用户请求以下操作时使用：(1) 明确请求文档转换，包括任何包含"转换"、"转为"、"转成"、"convert"、"导出"、"export"等词汇的请求（例如："转换文档"、"把这个文件转为docx"、"convert to markdown"、"导出为Word"）；(2) 需要 AI 理解文档内容（"帮我分析这个 Word 文件"、"读取这个 PDF"、"总结这个 Excel"）；(3) 上传文档文件并询问内容（"这是什么"、"帮我看看"）；(4) 任何涉及 .docx、.xlsx、.pptx、.pdf、.md 文件格式转换的请求。
 ---
-
 # DocuGenius Document Converter
 
 双向文档转换工具：
+
 - **Office/PDF → Markdown**：将 Office 文档和 PDF 转换为 AI 友好的 Markdown 格式
 - **Markdown → Word**：将 Markdown 文件转换为专业的 Word 文档
 
@@ -29,12 +29,14 @@ python3 --version
 ```
 
 **处理结果**：
+
 - **命令成功**：继续转换
 - **命令失败**：告知用户安装 Python，提供下载链接 https://www.python.org/downloads/
 
 ### 2. 验证文件格式
 
 支持的格式：
+
 - **Office/PDF → Markdown**: `.docx`, `.xlsx`, `.pptx`, `.pdf`
 - **Markdown → Word**: `.md`
 - **不支持**: `.doc`, `.xls`, `.ppt`（旧格式需先转换）
@@ -46,6 +48,7 @@ python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 ```
 
 参数：
+
 - `file_path`: 文档路径（必需）
 - `extract_images`: `true`/`false`（默认 `true`，仅用于 Office/PDF）
 - `output_dir`: 输出目录（Office/PDF 默认 `Markdown/`，Markdown 默认 `Word/`）
@@ -53,6 +56,7 @@ python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 ### 4. 处理结果
 
 脚本输出 JSON：
+
 ```json
 {
   "success": true,
@@ -112,13 +116,13 @@ pip install pdfplumber   # PDF
 
 ## 错误处理
 
-| 错误信息 | 原因 | 解决方案 |
-| --- | --- | --- |
-| 缺少依赖库: xxx | 未安装 Python 库 | 运行 `pip install xxx` |
-| 文件不存在 | 路径错误 | 检查文件路径 |
-| 文件过大 | 超过 100MB 限制 | 分割文件或压缩内容 |
-| 不支持的文件格式: .doc | 旧版 Office 格式 | 另存为 .docx/.xlsx/.pptx |
-| 未找到 Node.js | Markdown 转 Word 需要 Node.js | 安装 Node.js |
+| 错误信息               | 原因                          | 解决方案                 |
+| ---------------------- | ----------------------------- | ------------------------ |
+| 缺少依赖库: xxx        | 未安装 Python 库              | 运行 `pip install xxx` |
+| 文件不存在             | 路径错误                      | 检查文件路径             |
+| 文件过大               | 超过 100MB 限制               | 分割文件或压缩内容       |
+| 不支持的文件格式: .doc | 旧版 Office 格式              | 另存为 .docx/.xlsx/.pptx |
+| 未找到 Node.js         | Markdown 转 Word 需要 Node.js | 安装 Node.js             |
 
 ## 支持的格式详情
 
@@ -126,13 +130,13 @@ pip install pdfplumber   # PDF
 
 快速参考：
 
-| 格式 | 支持内容 | 质量 |
-| --- | --- | --- |
-| Word (.docx) | 文本、标题、列表、表格、粗体/斜体 | 优秀 |
-| Excel (.xlsx) | 表格、多工作表 | 优秀 |
-| PowerPoint (.pptx) | 幻灯片文本 | 良好 |
-| PDF (.pdf) | 文本、表格 | 取决于 PDF 类型 |
-| Markdown (.md) | 标题、列表、表格、代码块、格式 | 优秀 |
+| 格式               | 支持内容                          | 质量            |
+| ------------------ | --------------------------------- | --------------- |
+| Word (.docx)       | 文本、标题、列表、表格、粗体/斜体 | 优秀            |
+| Excel (.xlsx)      | 表格、多工作表                    | 优秀            |
+| PowerPoint (.pptx) | 幻灯片文本                        | 良好            |
+| PDF (.pdf)         | 文本、表格                        | 取决于 PDF 类型 |
+| Markdown (.md)     | 标题、列表、表格、代码块、格式    | 优秀            |
 
 ## 最佳实践
 
