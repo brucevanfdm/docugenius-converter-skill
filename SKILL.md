@@ -18,7 +18,7 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 
 ### 1. 检测 Python 环境
 
-**在执行转换前，必须先检测 Python 环境**：
+使用 Bash 工具检测 Python：
 
 ```bash
 # Windows
@@ -28,60 +28,71 @@ python --version
 python3 --version
 ```
 
-**处理结果**：
-
-- **命令成功**：继续转换
-- **命令失败**：告知用户安装 Python，提供下载链接 https://www.python.org/downloads/
+**根据结果采取行动**：
+- **成功**：继续步骤 2
+- **失败**：告知用户安装 Python（https://www.python.org/downloads/），等待用户安装后再继续
 
 ### 2. 验证文件格式
 
-支持的格式：
-
-- **Office/PDF → Markdown**: `.docx`, `.xlsx`, `.pptx`, `.pdf`
-- **Markdown → Word**: `.md`
-- **不支持**: `.doc`, `.xls`, `.ppt`（旧格式需先转换）
+检查文件扩展名：
+- **支持**: `.docx`, `.xlsx`, `.pptx`, `.pdf`, `.md`
+- **不支持**: `.doc`, `.xls`, `.ppt`（告知用户需先转换为新格式）
 
 ### 3. 执行转换
+
+使用 Bash 工具运行转换脚本：
 
 ```bash
 python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 ```
 
-参数：
-
+**参数说明**：
 - `file_path`: 文档路径（必需）
-- `extract_images`: `true`/`false`（默认 `true`，仅用于 Office/PDF）
-- `output_dir`: 输出目录（Office/PDF 默认 `Markdown/`，Markdown 默认 `Word/`）
+- `extract_images`: `true`/`false`（默认 `true`）
+- `output_dir`: 输出目录（可选）
 
-### 4. 处理结果
+### 4. 处理转换结果
 
-脚本输出 JSON：
+解析 JSON 输出：
+- **success: true**: 转换成功，继续步骤 5
+- **success: false**: 检查 error 字段，根据错误类型处理（参见"错误处理"章节）
 
-```json
-{
-  "success": true,
-  "markdown_content": "转换后的内容...",
-  "output_path": "/path/to/output.md"
-}
-```
+### 5. 向用户展示结果
+
+转换成功后：
+1. 告知用户输出文件路径
+2. 如果用户请求分析内容，使用 `markdown_content` 或读取输出文件
+3. 根据用户原始请求继续处理（分析、总结等）
 
 ## 常见模式
 
-### 模式 1: Office/PDF 转 Markdown
+### 模式 1: 转换并分析文档
+
+用户："分析这个 Word 文件的内容"
 
 ```bash
+# 1. 转换文档
 python scripts/convert_document.py /path/to/report.docx
+
+# 2. 解析 JSON 结果
+# 3. 使用 markdown_content 进行分析
+# 4. 向用户展示分析结果
 ```
 
 ### 模式 2: Markdown 转 Word
 
+用户："把这个 md 转成 docx"
+
 ```bash
+# 1. 检查 Node.js（如未安装会自动提示）
 python scripts/convert_document.py /path/to/document.md
+
+# 2. 告知用户输出路径
 ```
 
-**注意**：需要 Node.js 环境。如未安装，会提示错误。
+### 模式 3: 批量转换
 
-### 模式 3: 批量处理
+用户："转换这个文件夹里的所有文档"
 
 ```bash
 python scripts/convert_document.py --batch /path/to/documents
@@ -89,7 +100,9 @@ python scripts/convert_document.py --batch /path/to/documents
 
 ## 依赖安装
 
-### 方式 1: 运行安装脚本
+当转换脚本报错"缺少依赖库"时，引导用户安装：
+
+### 方式 1: 运行安装脚本（推荐）
 
 ```bash
 # Windows
@@ -99,13 +112,13 @@ install.bat
 chmod +x install.sh && ./install.sh
 ```
 
-### 方式 2: 手动安装
+### 方式 2: 使用 pip 安装全部依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 方式 3: 按需安装
+### 方式 3: 按需安装特定库
 
 ```bash
 pip install python-docx  # Word
@@ -116,13 +129,15 @@ pip install pdfplumber   # PDF
 
 ## 错误处理
 
-| 错误信息               | 原因                          | 解决方案                 |
-| ---------------------- | ----------------------------- | ------------------------ |
-| 缺少依赖库: xxx        | 未安装 Python 库              | 运行 `pip install xxx` |
-| 文件不存在             | 路径错误                      | 检查文件路径             |
-| 文件过大               | 超过 100MB 限制               | 分割文件或压缩内容       |
-| 不支持的文件格式: .doc | 旧版 Office 格式              | 另存为 .docx/.xlsx/.pptx |
-| 未找到 Node.js         | Markdown 转 Word 需要 Node.js | 安装 Node.js             |
+根据错误信息采取相应行动：
+
+| 错误信息               | 原因               | 解决方案                                    |
+| ---------------------- | ------------------ | ------------------------------------------- |
+| 缺少依赖库: xxx        | 未安装 Python 库   | 使用 Bash 运行 `pip install xxx`            |
+| 文件不存在             | 路径错误           | 验证文件路径，使用绝对路径                  |
+| 文件过大               | 超过 100MB 限制    | 告知用户需分割文件或压缩内容                |
+| 不支持的文件格式: .doc | 旧版 Office 格式   | 告知用户需先转换为 .docx/.xlsx/.pptx        |
+| 未找到 Node.js         | Markdown 转 Word   | 告知用户需安装 Node.js (https://nodejs.org) |
 
 ## 支持的格式详情
 
