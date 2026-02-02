@@ -691,10 +691,7 @@ def convert_pdf(file_path):
 
     content = ""
     with pdfplumber.open(file_path) as pdf:
-        for i, page in enumerate(pdf.pages):
-            if len(pdf.pages) > 1:
-                content += f"## Page {i+1}\n\n"
-
+        for page in pdf.pages:
             # 提取表格
             tables = page.extract_tables()
             if tables:
@@ -731,10 +728,6 @@ def convert_pdf(file_path):
                         cleaned_lines.append(line)
 
                 if cleaned_lines:
-                    # 如果这个页面已经有表格了，添加一个分隔
-                    if tables:
-                        content += "### 文本内容\n\n"
-
                     content += '\n'.join(cleaned_lines) + "\n\n"
 
     return content.strip()
