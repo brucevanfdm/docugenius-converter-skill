@@ -7,6 +7,70 @@ description: 文档转换工具，将 Word (.docx)、Excel (.xlsx)、PowerPoint 
 
 独立的文档转换工具，将 Office 文档和 PDF 转换为 AI 友好的 Markdown 格式。
 
+## 前置要求：Python 环境
+
+此工具需要 Python 3.6 或更高版本。
+
+### 检查 Python 是否已安装
+
+**Windows:**
+```bash
+python --version
+```
+
+**macOS/Linux:**
+```bash
+python3 --version
+```
+
+如果显示版本号（如 `Python 3.8.10`）且版本 >= 3.6，说明已安装，可以跳过安装步骤。
+
+### 安装 Python
+
+如果未安装 Python 或版本过低，请按照以下步骤安装：
+
+**Windows:**
+1. 访问 [Python 官网](https://www.python.org/downloads/)
+2. 下载最新的 Python 3.x 版本（推荐 3.8 或更高）
+3. 运行安装程序
+4. **重要**：勾选 "Add Python to PATH" 选项
+5. 点击 "Install Now"
+6. 安装完成后，打开新的命令提示符窗口，运行 `python --version` 验证
+
+**macOS:**
+```bash
+# 使用 Homebrew（推荐）
+brew install python3
+
+# 或访问官网下载安装包
+# https://www.python.org/downloads/macos/
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt update
+sudo apt install python3 python3-pip
+```
+
+**Linux (CentOS/RHEL):**
+```bash
+sudo yum install python3 python3-pip
+```
+
+### 验证安装
+
+安装完成后，验证 Python 和 pip 是否可用：
+
+```bash
+# Windows
+python --version
+python -m pip --version
+
+# macOS/Linux
+python3 --version
+python3 -m pip --version
+```
+
 ## 快速开始
 
 ### 安装依赖
@@ -54,13 +118,46 @@ else:
 - 用户请求批量处理多个文档
 - 用户需要将文档内容用于后续的AI处理
 
-### 2. 验证文件
+### 2. 检查 Python 环境
+
+在执行转换前，确保用户已安装 Python：
+
+**检查方法：**
+```bash
+# Windows
+python --version
+
+# macOS/Linux
+python3 --version
+```
+
+**如果 Python 未安装或版本过低：**
+1. 告知用户需要 Python 3.6 或更高版本
+2. 引导用户查看 skill.md 中的"前置要求：Python 环境"章节
+3. 提供快速安装链接：
+   - Windows: https://www.python.org/downloads/
+   - macOS: `brew install python3`
+   - Linux: `sudo apt install python3 python3-pip`
+
+**如果 Python 已安装但依赖库缺失：**
+1. 引导用户运行安装脚本：
+   - Windows: `install.bat`
+   - macOS/Linux: `./install.sh`
+2. 或手动安装：`pip install -r requirements.txt`
+
+### 3. 验证文件
 
 检查文件是否存在且格式受支持：
 - **支持**: `.docx`, `.xlsx`, `.pptx`, `.pdf`
 - **不支持**: `.doc`, `.xls`, `.ppt`（旧格式 - 需先转换）
 
-### 3. 转换文档
+### 3. 验证文件
+
+检查文件是否存在且格式受支持：
+- **支持**: `.docx`, `.xlsx`, `.pptx`, `.pdf`
+- **不支持**: `.doc`, `.xls`, `.ppt`（旧格式 - 需先转换）
+
+### 4. 转换文档
 
 使用转换脚本：
 
@@ -73,7 +170,7 @@ python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 - `extract_images`: `true` 或 `false`（默认: `true`，**注意：当前版本此参数保留供未来使用，暂不影响转换结果**）
 - `output_dir`: 可选的输出目录（默认: 同目录下的 `Markdown/` 子目录）
 
-### 4. 处理结果
+### 5. 处理结果
 
 脚本输出 JSON 格式结果：
 - `success`: 布尔值，表示转换是否成功
@@ -81,7 +178,7 @@ python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 - `output_path`: 保存的 .md 文件路径
 - `error`: 错误信息（如果转换失败）
 
-### 5. 呈现给用户
+### 6. 呈现给用户
 
 转换成功后：
 1. 显示输出路径
