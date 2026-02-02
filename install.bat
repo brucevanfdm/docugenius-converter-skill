@@ -36,16 +36,52 @@ if errorlevel 1 (
 echo [OK] Python 版本符合要求
 echo.
 
-REM 安装 Python 依赖
+REM ========== 创建全局共享虚拟环境 ==========
+echo 正在创建全局共享虚拟环境...
+
+REM 全局虚拟环境位置（所有项目共享）
+set GLOBAL_VENV_BASE=%USERPROFILE%\.claude\venvs
+set VENV_DIR=%GLOBAL_VENV_BASE%\docugenius-converter
+
+REM 创建全局 venv 基础目录
+if not exist "%GLOBAL_VENV_BASE%" mkdir "%GLOBAL_VENV_BASE%"
+
+REM 如果虚拟环境已存在，先删除
+if exist "%VENV_DIR%" (
+    echo 检测到已存在的虚拟环境，正在删除...
+    rmdir /s /q "%VENV_DIR%"
+)
+
+REM 创建虚拟环境
+python -m venv "%VENV_DIR%"
+
+if errorlevel 1 (
+    echo.
+    echo [ERROR] 虚拟环境创建失败。
+    echo 请确保已安装 Python 3.6+ 并勾选了 "Add Python to PATH"。
+    pause
+    exit /b 1
+)
+
+echo [OK] 全局虚拟环境创建成功: %VENV_DIR%
+echo [说明] 所有项目共享此虚拟环境，无需重复安装依赖
+echo.
+
+REM 激活虚拟环境并安装依赖
 echo 正在安装 Python 依赖库...
+call "%VENV_DIR%\Scripts\activate.bat"
+python -m pip install --upgrade pip >nul 2>&1
 python -m pip install -r requirements.txt
 
 if errorlevel 1 (
     echo.
-    echo × Python 依赖安装失败。请检查错误信息。
+    echo [ERROR] Python 依赖安装失败。请检查错误信息。
+    call deactivate
     pause
     exit /b 1
 )
+
+call deactivate
 
 echo [OK] Python 依赖安装成功！
 echo.
@@ -95,6 +131,10 @@ echo   - Office/PDF 转 Markdown: .docx, .xlsx, .pptx, .pdf
 echo   - Markdown 转 Word: .md (需要 Node.js)
 echo.
 echo 使用方法:
+echo   convert.bat ^<file_path^>
+echo.
+echo 或者手动激活全局虚拟环境:
+echo   %%USERPROFILE%%\.claude\venvs\docugenius-converter\Scripts\activate.bat
 echo   python scripts\convert_document.py ^<file_path^>
 echo.
 pause

@@ -4,6 +4,8 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.venv/
+venv/
 build/
 develop-eggs/
 dist/
@@ -45,4 +47,7 @@ Thumbs.db
 # 测试文件
 test.md
 test.docx
-.claude
+
+# Claude 缓存和虚拟环境（本地开发时）
+.claude/cache/
+# 注意：.claude/venvs/ 是全局共享的，不在此忽略

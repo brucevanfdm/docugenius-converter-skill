@@ -45,6 +45,11 @@ python3 --version
 使用 Bash 工具运行转换脚本：
 
 ```bash
+# 使用便捷脚本（自动激活全局虚拟环境）
+./convert.sh <file_path> [extract_images] [output_dir]
+
+# 或手动激活全局虚拟环境后运行
+source ~/.claude/venvs/docugenius-converter/bin/activate  # Windows: %USERPROFILE%\.claude\venvs\docugenius-converter\Scripts\activate
 python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 ```
 
@@ -83,7 +88,7 @@ python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 执行转换，解析返回的 JSON 中的 `markdown_content`，分析后向用户展示结果。
 
 ```bash
-python scripts/convert_document.py /path/to/report.docx
+./convert.sh /path/to/report.docx
 ```
 
 ### 模式 2: Markdown 转 Word
@@ -93,7 +98,7 @@ python scripts/convert_document.py /path/to/report.docx
 执行转换，告知用户输出文件路径。
 
 ```bash
-python scripts/convert_document.py /path/to/document.md
+./convert.sh /path/to/document.md
 ```
 
 ### 模式 3: 批量转换
@@ -101,7 +106,7 @@ python scripts/convert_document.py /path/to/document.md
 用户："转换这个文件夹里的所有文档"
 
 ```bash
-python scripts/convert_document.py --batch /path/to/documents
+./convert.sh --batch /path/to/documents
 ```
 
 ## 依赖安装
@@ -118,15 +123,27 @@ install.bat
 chmod +x install.sh && ./install.sh
 ```
 
-### 方式 2: 使用 pip 安装全部依赖
+### 方式 2: 使用全局共享虚拟环境（推荐）
+
+安装脚本会自动创建全局虚拟环境 `~/.claude/venvs/docugenius-converter`，所有项目共享此环境，无需重复安装。
+
+**手动创建全局虚拟环境**：
 
 ```bash
+# 创建并激活全局虚拟环境
+python3 -m venv ~/.claude/venvs/docugenius-converter
+source ~/.claude/venvs/docugenius-converter/bin/activate
+
+# 安装依赖
 pip install -r requirements.txt
 ```
 
 ### 方式 3: 按需安装特定库
 
 ```bash
+# 激活全局虚拟环境后
+source ~/.claude/venvs/docugenius-converter/bin/activate
+
 pip install python-docx  # Word
 pip install openpyxl     # Excel
 pip install python-pptx  # PowerPoint
@@ -172,5 +189,5 @@ pip install pdfplumber   # PDF
 转换脚本使用项目级缓存存储依赖检测结果（位置：`.claude/cache/docugenius-converter/`）。
 
 - **缓存策略**：永不过期，仅在 `requirements.txt` 变更时自动失效
-- **清除缓存**：如需强制重新检测依赖，运行 `python scripts/convert_document.py --clear-cache`
+- **清除缓存**：如需强制重新检测依赖，运行 `./convert.sh --clear-cache`
 

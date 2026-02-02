@@ -48,15 +48,50 @@ fi
 echo "[OK] Python 版本符合要求"
 echo ""
 
-# 安装 Python 依赖
+# ========== 创建全局共享虚拟环境 ==========
+echo "正在创建全局共享虚拟环境..."
+
+# 全局虚拟环境位置（所有项目共享）
+GLOBAL_VENV_BASE="$HOME/.claude/venvs"
+VENV_DIR="$GLOBAL_VENV_BASE/docugenius-converter"
+
+# 创建全局 venv 基础目录
+mkdir -p "$GLOBAL_VENV_BASE"
+
+# 如果虚拟环境已存在，先删除
+if [ -d "$VENV_DIR" ]; then
+    echo "检测到已存在的虚拟环境，正在删除..."
+    rm -rf "$VENV_DIR"
+fi
+
+# 创建虚拟环境
+$PYTHON_CMD -m venv "$VENV_DIR"
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "[ERROR] 虚拟环境创建失败。请确保已安装 python3-venv。"
+    echo "  macOS:   brew install python@3.11 或 python@3.12"
+    echo "  Ubuntu:  sudo apt install python3-venv"
+    exit 1
+fi
+
+echo "[OK] 全局虚拟环境创建成功: $VENV_DIR"
+echo "[说明] 所有项目共享此虚拟环境，无需重复安装依赖"
+echo ""
+
+# 激活虚拟环境并安装依赖
 echo "正在安装 Python 依赖库..."
-$PYTHON_CMD -m pip install -r requirements.txt
+source "$VENV_DIR/bin/activate"
+pip install --upgrade pip >/dev/null 2>&1
+pip install -r requirements.txt
 
 if [ $? -ne 0 ]; then
     echo ""
     echo "[ERROR] Python 依赖安装失败。请检查错误信息。"
     exit 1
 fi
+
+deactivate
 
 echo "[OK] Python 依赖安装成功！"
 echo ""
@@ -105,5 +140,9 @@ echo "  - Office/PDF 转 Markdown: .docx, .xlsx, .pptx, .pdf"
 echo "  - Markdown 转 Word: .md (需要 Node.js)"
 echo ""
 echo "使用方法:"
-echo "  $PYTHON_CMD scripts/convert_document.py <file_path>"
+echo "  ./convert.sh <file_path>"
+echo ""
+echo "或者手动激活全局虚拟环境:"
+echo "  source ~/.claude/venvs/docugenius-converter/bin/activate"
+echo "  python scripts/convert_document.py <file_path>"
 echo ""

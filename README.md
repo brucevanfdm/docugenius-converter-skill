@@ -63,17 +63,9 @@ git clone https://github.com/yourusername/docugenius-converter-skill.git %USERPR
 
 ### 3. 安装依赖
 
-首次使用 Skill 时，Claude Code 会自动检测依赖。如缺少依赖，会引导你安装：
+首次使用 Skill 时，Claude Code 会自动检测依赖。如缺少依赖，会引导你安装。
 
-```bash
-pip install -r requirements.txt
-
-# 可选：Markdown → Word 功能需要 Node.js
-cd scripts/md_to_docx
-npm install
-```
-
-或运行安装脚本（推荐）：
+**推荐方式**：运行安装脚本，自动创建全局共享虚拟环境（所有项目共用，只需安装一次）：
 
 ```bash
 # macOS/Linux
@@ -81,6 +73,26 @@ chmod +x install.sh && ./install.sh
 
 # Windows
 install.bat
+```
+
+**说明**：
+- 虚拟环境安装在 `~/.claude/venvs/docugenius-converter`
+- 所有使用此 skill 的项目共享此环境，无需重复安装
+- 避免 macOS PEP 668 系统保护限制
+
+**手动安装（可选）**：
+
+```bash
+# 创建全局虚拟环境
+python3 -m venv ~/.claude/venvs/docugenius-converter
+source ~/.claude/venvs/docugenius-converter/bin/activate
+
+# 安装 Python 依赖
+pip install -r requirements.txt
+
+# 可选：Markdown → Word 功能需要 Node.js
+cd scripts/md_to_docx
+npm install
 ```
 
 ## 使用方式
@@ -192,6 +204,8 @@ docugenius-converter-skill/
 ├── SKILL.md                 # Claude Code Skill 定义
 ├── install.sh               # 安装脚本 (macOS/Linux)
 ├── install.bat              # 安装脚本 (Windows)
+├── convert.sh               # 便捷运行脚本 (macOS/Linux)
+├── convert.bat              # 便捷运行脚本 (Windows)
 ├── requirements.txt         # Python 依赖
 ├── scripts/
 │   ├── convert_document.py  # 转换脚本核心
@@ -199,6 +213,9 @@ docugenius-converter-skill/
 ├── references/
 │   └── supported-formats.md # 格式支持详情
 └── tests/                   # 测试文件
+
+全局虚拟环境（安装后创建）:
+~/.claude/venvs/docugenius-converter/  # 所有项目共享
 ```
 
 ## 技术细节
@@ -216,7 +233,7 @@ docugenius-converter-skill/
 
 - 位置：`.claude/cache/docugenius-converter/`
 - 策略：永不过期，`requirements.txt` 变更时自动失效
-- 清除：`python scripts/convert_document.py --clear-cache`
+- 清除：`./convert.sh --clear-cache` 或 `python scripts/convert_document.py --clear-cache`
 
 ## 许可证
 
