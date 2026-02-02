@@ -1,6 +1,6 @@
 ---
 name: docugenius-converter
-description: 独立的文档转换工具，将 Word (.docx)、Excel (.xlsx)、PowerPoint (.pptx) 和 PDF (.pdf) 文档转换为 AI 友好的 Markdown 格式。使用轻量级 Python 库（python-docx、openpyxl、python-pptx、pdfplumber）实现，无需依赖 VSCode 扩展。当用户明确请求文档转换（"convert this document"、"转换文档"）、需要 AI 理解文档内容（"帮我分析这个 Word 文件"、"读取这个 PDF"）、上传文档文件并询问内容，或请求批量处理文档时使用此 skill。
+description: 文档转换工具，将 Word (.docx)、Excel (.xlsx)、PowerPoint (.pptx) 和 PDF (.pdf) 转换为 Markdown 格式。当用户请求转换文档、需要分析文档内容（"分析这个 Word"、"读取这个 PDF"）、或批量处理文档时使用。
 ---
 
 # DocuGenius Document Converter
