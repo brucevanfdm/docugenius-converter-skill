@@ -76,11 +76,81 @@ def _normalize_table_cell(value):
     return text
 
 def convert_docx(file_path):
-    """转换 Word 文档，支持标题、格式和列表"""
+    """转换 Word 文档，支持标题、格式和列表（含编号/层级）"""
     import docx
 
     doc = docx.Document(file_path)
     content = ""
+
+    def get_numbering_info(para):
+        """
+        尝试从段落的 numPr / numbering.xml 解析列表信息
+
+        Returns:
+            None 或 {'level': int, 'ordered': bool}
+        """
+        try:
+            p = getattr(para, "_p", None)
+            ppr = getattr(p, "pPr", None) if p is not None else None
+            num_pr = getattr(ppr, "numPr", None) if ppr is not None else None
+            if num_pr is None:
+                return None
+
+            num_id_el = getattr(num_pr, "numId", None)
+            ilvl_el = getattr(num_pr, "ilvl", None)
+            level = int(ilvl_el.val) if ilvl_el is not None and getattr(ilvl_el, "val", None) is not None else 0
+
+            num_fmt = None
+            num_id = None
+            if num_id_el is not None and getattr(num_id_el, "val", None) is not None:
+                try:
+                    num_id = int(num_id_el.val)
+                except Exception:
+                    num_id = None
+
+            if num_id is not None:
+                try:
+                    numbering = doc.part.numbering_part.element
+                    ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+                    num_nodes = numbering.xpath(f'.//w:num[@w:numId="{num_id}"]', namespaces=ns)
+                    if num_nodes:
+                        abstract_id_nodes = num_nodes[0].xpath('./w:abstractNumId', namespaces=ns)
+                        if abstract_id_nodes:
+                            abstract_id = abstract_id_nodes[0].get(f'{{{ns["w"]}}}val')
+                            abstract_nodes = numbering.xpath(
+                                f'.//w:abstractNum[@w:abstractNumId="{abstract_id}"]',
+                                namespaces=ns,
+                            )
+                            if abstract_nodes:
+                                lvl_nodes = abstract_nodes[0].xpath(f'./w:lvl[@w:ilvl="{level}"]', namespaces=ns)
+                                if not lvl_nodes:
+                                    lvl_nodes = abstract_nodes[0].xpath('./w:lvl', namespaces=ns)
+                                if lvl_nodes:
+                                    fmt_nodes = lvl_nodes[0].xpath('./w:numFmt', namespaces=ns)
+                                    if fmt_nodes:
+                                        num_fmt = fmt_nodes[0].get(f'{{{ns["w"]}}}val')
+                except Exception:
+                    num_fmt = None
+
+            style = getattr(para, "style", None)
+            style_name = getattr(style, "name", "") if style is not None else ""
+            style_id = getattr(style, "style_id", "") if style is not None else ""
+            style_hint = f"{style_name} {style_id}".lower()
+
+            if (num_fmt or "").lower() == "bullet":
+                ordered = False
+            elif (num_fmt or ""):
+                ordered = True
+            elif "bullet" in style_hint or "项目符号" in style_hint or "符号" in style_hint:
+                ordered = False
+            elif "number" in style_hint or "编号" in style_hint:
+                ordered = True
+            else:
+                ordered = True
+
+            return {'level': max(level, 0), 'ordered': ordered}
+        except Exception:
+            return None
 
     def format_run_text(run):
         """格式化单个文本片段，添加Markdown格式标记"""
@@ -107,6 +177,14 @@ def convert_docx(file_path):
         style_name = style.name if style else ""
         style_id = getattr(style, "style_id", "") if style else ""
 
+        # 先拼接富文本（列表项也需要保留粗体/斜体）
+        formatted_text = ""
+        for run in para.runs:
+            formatted_text += format_run_text(run)
+        text_value = (formatted_text.strip() or para.text.strip()).replace("\n", " ").strip()
+        if not text_value:
+            return ""
+
         # 识别标题层级
         heading_level = None
         if isinstance(style_id, str) and style_id:
@@ -124,35 +202,30 @@ def convert_docx(file_path):
             return f"{heading_prefix} {para.text.strip()}\n\n"
 
         # 检查是否是列表项
-        # 注意：python-docx对列表的支持有限，这里做基本处理
+        # 优先使用 numPr + numbering.xml 解析列表编号格式与层级
+        numbering_info = get_numbering_info(para)
+        if numbering_info:
+            indent = "    " * numbering_info["level"]
+            marker = "1." if numbering_info["ordered"] else "-"
+            return f"{indent}{marker} {text_value}\n"
+
+        # 注意：python-docx对列表的支持有限，这里做基本处理（按样式兜底）
         style_name_str = style_name or ""
         style_id_str = style_id or ""
         if (isinstance(style_id_str, str) and style_id_str.startswith("List")) or (
             isinstance(style_name_str, str) and style_name_str.startswith("List")
         ):
+            level = 0
+            m = re.search(r"(\\d+)$", style_name_str.strip())
+            if m:
+                level = max(int(m.group(1)) - 1, 0)
+            indent = "    " * level
             if "Bullet" in style_id_str or "Bullet" in style_name_str or style_name_str == "List Bullet":
-                return f"- {para.text.strip()}\n"
+                return f"{indent}- {text_value}\n"
             if "Number" in style_id_str or "Number" in style_name_str or style_name_str == "List Number":
-                return f"1. {para.text.strip()}\n"
+                return f"{indent}1. {text_value}\n"
 
-        # 兼容未显式使用“List *”样式、但带有编号属性的段落
-        try:
-            ppr = getattr(para._p, "pPr", None)
-            num_pr = getattr(ppr, "numPr", None) if ppr is not None else None
-            if num_pr is not None:
-                return f"- {para.text.strip()}\n"
-        except Exception:
-            pass
-
-        # 处理普通段落，保留文本格式
-        formatted_text = ""
-        for run in para.runs:
-            formatted_text += format_run_text(run)
-
-        if formatted_text.strip():
-            return formatted_text.strip() + "\n\n"
-
-        return ""
+        return text_value + "\n\n"
 
     # 处理文档中的所有元素（段落和表格）
     # 需要按照它们在文档中的顺序处理
