@@ -252,43 +252,59 @@ def install_dependencies(pip_packages):
     python_exe = sys.executable or 'python'
 
     # 构建安装命令
-    # 使用 --user 安装到用户目录，避免 PEP 668 限制
-    cmd = [python_exe, '-m', 'pip', 'install', '--user'] + pip_packages
+    # 首先尝试 --user 安装到用户目录，避免 PEP 668 限制
+    # 如果失败，回退到 --break-system-packages（适用于使用系统 Python 的情况）
+    install_methods = [
+        ('--user', '用户目录'),
+        ('--break-system-packages', '系统目录（绕过 PEP 668 保护）'),
+    ]
 
-    try:
-        # 显示安装提示（仅在首次安装时）
-        print(f"[DocuGenius] 正在安装缺失的依赖: {', '.join(pip_packages)}", file=sys.stderr)
-        print(f"[DocuGenius] 安装位置: 用户目录 (不受系统保护限制)", file=sys.stderr)
+    for install_flag, location_desc in install_methods:
+        cmd = [python_exe, '-m', 'pip', 'install', install_flag] + pip_packages
 
-        # 运行安装命令
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-            # 不使用 encoding 参数，让 subprocess 使用系统默认
-        )
+        try:
+            # 显示安装提示（仅在首次安装时）
+            print(f"[DocuGenius] 正在安装缺失的依赖: {', '.join(pip_packages)}", file=sys.stderr)
+            print(f"[DocuGenius] 安装位置: {location_desc}", file=sys.stderr)
 
-        if result.returncode == 0:
-            print(f"[DocuGenius] 依赖安装成功！", file=sys.stderr)
-            return True, None
-        else:
+            # 运行安装命令
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                newlines=True,
+            )
+
+            if result.returncode == 0:
+                print(f"[DocuGenius] 依赖安装成功！", file=sys.stderr)
+                return True, None
+
+            # 检查错误类型，决定是否尝试下一种方法
+            error_output = result.stderr.strip() or result.stdout.strip()
+
+            # 如果是 PEP 668 相关错误，尝试下一种方法
+            if 'externally-managed-environment' in error_output or 'PEP 668' in error_output:
+                continue
+
+            # 其他错误不再重试
             # 检查是否是权限问题
-            if "Permission denied" in result.stderr or "Access denied" in result.stderr:
-                return False, f"权限不足。请尝试: pip install --user {' '.join(pip_packages)}"
+            if "Permission denied" in error_output or "Access denied" in error_output:
+                return False, f"权限不足。请尝试: pip install {install_flag} {' '.join(pip_packages)}"
 
             # 检查是否是 pip 不存在
-            if "No module named pip" in result.stderr:
+            if "No module named pip" in error_output:
                 return False, "pip 未安装。请先安装 pip: python -m ensurepip --upgrade"
 
             # 其他错误
-            error_detail = result.stderr.strip() or result.stdout.strip()
-            return False, f"依赖安装失败: {error_detail}"
+            return False, f"依赖安装失败: {error_output}"
 
-    except FileNotFoundError:
-        return False, f"找不到 Python 解释器: {python_exe}"
-    except Exception as e:
-        return False, f"依赖安装时发生错误: {str(e)}"
+        except FileNotFoundError:
+            return False, f"找不到 Python 解释器: {python_exe}"
+        except Exception as e:
+            return False, f"依赖安装时发生错误: {str(e)}"
+
+    # 所有方法都失败
+    return False, "依赖安装失败：所有安装方法都失败（包括 --user 和 --break-system-packages）"
 
 
 # ==================== 依赖检查函数 ====================
