@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
-    "test": "node index.js"
+    "test": "node index.js --help"
   },
   "dependencies": {
     "docx": "^9.5.1",

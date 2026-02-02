@@ -21,6 +21,10 @@ import re
 import subprocess
 import shutil
 
+SUPPORTED_EXTENSIONS = ['.docx', '.xlsx', '.pptx', '.pdf', '.md']
+MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
+NODE_CONVERT_TIMEOUT_SECONDS = 120
+
 # 确保 Windows 上使用 UTF-8 编码
 if sys.platform == 'win32':
     if hasattr(sys.stdout, 'reconfigure'):
@@ -221,7 +225,7 @@ def convert_docx(file_path):
             isinstance(style_name_str, str) and style_name_str.startswith("List")
         ):
             level = 0
-            m = re.search(r"(\\d+)$", style_name_str.strip())
+            m = re.search(r"(\d+)$", style_name_str.strip())
             if m:
                 level = max(int(m.group(1)) - 1, 0)
             indent = "    " * level
@@ -432,10 +436,11 @@ def convert_md(file_path, output_dir=None):
 
         result = subprocess.run(
             cmd,
-            capture_output=True,
-            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
             encoding='utf-8',
-            timeout=120  # 2分钟超时
+            timeout=NODE_CONVERT_TIMEOUT_SECONDS,
         )
 
         # 解析输出
@@ -487,13 +492,12 @@ def convert_document(file_path, extract_images=True, output_dir=None):
         }
 
     # 检查文件大小（限制为100MB）
-    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
     try:
         file_size = os.path.getsize(file_path)
-        if file_size > MAX_FILE_SIZE:
+        if file_size > MAX_FILE_SIZE_BYTES:
             return {
                 'success': False,
-                'error': f'文件过大: {file_size / (1024*1024):.2f}MB，超过限制 {MAX_FILE_SIZE / (1024*1024):.0f}MB'
+                'error': f'文件过大: {file_size / (1024*1024):.2f}MB，超过限制 {MAX_FILE_SIZE_BYTES / (1024*1024):.0f}MB'
             }
     except OSError as e:
         return {
@@ -502,12 +506,11 @@ def convert_document(file_path, extract_images=True, output_dir=None):
         }
 
     # 检查文件扩展名
-    supported_extensions = ['.docx', '.xlsx', '.pptx', '.pdf', '.md']
     file_ext = os.path.splitext(file_path)[1].lower()
-    if file_ext not in supported_extensions:
+    if file_ext not in SUPPORTED_EXTENSIONS:
         return {
             'success': False,
-            'error': f'不支持的文件格式: {file_ext}。支持的格式: {", ".join(supported_extensions)}'
+            'error': f'不支持的文件格式: {file_ext}。支持的格式: {", ".join(SUPPORTED_EXTENSIONS)}'
         }
 
     # Markdown 转 DOCX 使用单独的处理流程
@@ -598,25 +601,24 @@ def batch_convert(directory, recursive=True, extract_images=True, output_dir=Non
     Returns:
         转换结果列表
     """
-    supported_extensions = ['.docx', '.xlsx', '.pptx', '.pdf', '.md']
     results = []
 
     if recursive:
         # 递归扫描
-        for root, dirs, files in os.walk(directory):
-            for file in files:
-                if os.path.splitext(file)[1].lower() in supported_extensions:
-                    file_path = os.path.join(root, file)
-                    result = convert_document(file_path, extract_images, output_dir)
-                    results.append({
-                        'file': file_path,
+            for root, dirs, files in os.walk(directory):
+                for file in files:
+                    if os.path.splitext(file)[1].lower() in SUPPORTED_EXTENSIONS:
+                        file_path = os.path.join(root, file)
+                        result = convert_document(file_path, extract_images, output_dir)
+                        results.append({
+                            'file': file_path,
                         'result': result
                     })
     else:
         # 只扫描当前目录
         for file in os.listdir(directory):
             file_path = os.path.join(directory, file)
-            if os.path.isfile(file_path) and os.path.splitext(file)[1].lower() in supported_extensions:
+            if os.path.isfile(file_path) and os.path.splitext(file)[1].lower() in SUPPORTED_EXTENSIONS:
                 result = convert_document(file_path, extract_images, output_dir)
                 results.append({
                     'file': file_path,

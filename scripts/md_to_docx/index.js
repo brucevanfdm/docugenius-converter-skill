@@ -6,10 +6,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { Document, Packer } = require('docx');
-const { markdownToHTML } = require('./markdown-converter');
-const { convertHTMLToDocx } = require('./html-converter');
-const { createStyles, createNumbering, createMargins } = require('./styles');
 
 /**
  * 将 Markdown 文件转换为 DOCX
@@ -19,6 +15,11 @@ const { createStyles, createNumbering, createMargins } = require('./styles');
  */
 async function convertMarkdownToDocx(inputPath, outputDir) {
   try {
+    const { Document, Packer } = require('docx');
+    const { markdownToHTML } = require('./markdown-converter');
+    const { convertHTMLToDocx } = require('./html-converter');
+    const { createStyles, createNumbering, createMargins } = require('./styles');
+
     // 验证输入文件
     if (!fs.existsSync(inputPath)) {
       return { success: false, error: `文件不存在: ${inputPath}` };
@@ -82,6 +83,14 @@ async function convertMarkdownToDocx(inputPath, outputDir) {
 // 命令行入口
 async function main() {
   const args = process.argv.slice(2);
+
+  if (args.includes('-h') || args.includes('--help')) {
+    console.log(JSON.stringify({
+      success: true,
+      usage: 'node index.js <input.md> [output_dir]'
+    }, null, 2));
+    process.exit(0);
+  }
 
   if (args.length < 1) {
     console.log(JSON.stringify({

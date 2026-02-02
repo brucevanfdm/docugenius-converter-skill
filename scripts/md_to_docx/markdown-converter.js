@@ -105,57 +105,88 @@ function escapeHTML(text) {
 function processLists(html) {
   const lines = html.split('\n');
   const result = [];
-  let inList = false;
-  let listType = '';
-  let listItems = [];
+  const stack = [];
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  const countLeadingSpaces = (s) => {
+    let count = 0;
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === ' ') count++;
+      else if (s[i] === '\t') count += 4;
+      else break;
+    }
+    return count;
+  };
+
+  const closeToIndent = (targetIndent) => {
+    while (stack.length > 0 && targetIndent < stack[stack.length - 1].indent) {
+      const top = stack[stack.length - 1];
+      if (top.hasOpenLi) {
+        result.push('</li>');
+        top.hasOpenLi = false;
+      }
+      result.push(`</${top.type}>`);
+      stack.pop();
+    }
+  };
+
+  const closeAll = () => closeToIndent(-1);
+
+  const ensureList = (type, indent) => {
+    if (stack.length === 0) {
+      result.push(`<${type}>`);
+      stack.push({ type, indent, hasOpenLi: false });
+      return;
+    }
+
+    const top = stack[stack.length - 1];
+    if (indent > top.indent) {
+      result.push(`<${type}>`);
+      stack.push({ type, indent, hasOpenLi: false });
+      return;
+    }
+
+    if (indent === top.indent && type !== top.type) {
+      if (top.hasOpenLi) {
+        result.push('</li>');
+        top.hasOpenLi = false;
+      }
+      result.push(`</${top.type}>`);
+      stack.pop();
+      result.push(`<${type}>`);
+      stack.push({ type, indent, hasOpenLi: false });
+    }
+  };
+
+  for (const line of lines) {
     const ulMatch = line.match(/^(\s*)[-*+]\s+(.+)$/);
     const olMatch = line.match(/^(\s*)\d+\.\s+(.+)$/);
 
-    if (ulMatch) {
-      if (!inList || listType !== 'ul') {
-        if (inList) {
-          result.push(closeList(listType, listItems));
-          listItems = [];
-        }
-        inList = true;
-        listType = 'ul';
-      }
-      listItems.push(ulMatch[2]);
-    } else if (olMatch) {
-      if (!inList || listType !== 'ol') {
-        if (inList) {
-          result.push(closeList(listType, listItems));
-          listItems = [];
-        }
-        inList = true;
-        listType = 'ol';
-      }
-      listItems.push(olMatch[2]);
-    } else {
-      if (inList) {
-        result.push(closeList(listType, listItems));
-        listItems = [];
-        inList = false;
-        listType = '';
-      }
+    if (!ulMatch && !olMatch) {
+      closeAll();
       result.push(line);
+      continue;
     }
+
+    const indentStr = (ulMatch || olMatch)[1] || '';
+    const indent = countLeadingSpaces(indentStr);
+    const type = ulMatch ? 'ul' : 'ol';
+    const itemText = (ulMatch || olMatch)[2];
+
+    closeToIndent(indent);
+    ensureList(type, indent);
+
+    const current = stack[stack.length - 1];
+    if (current.hasOpenLi) {
+      result.push('</li>');
+      current.hasOpenLi = false;
+    }
+
+    result.push(`<li>${itemText}`);
+    current.hasOpenLi = true;
   }
 
-  if (inList) {
-    result.push(closeList(listType, listItems));
-  }
-
+  closeAll();
   return result.join('\n');
-}
-
-function closeList(type, items) {
-  const tag = type === 'ul' ? 'ul' : 'ol';
-  const itemsHtml = items.map(item => `<li>${item}</li>`).join('\n');
-  return `<${tag}>\n${itemsHtml}\n</${tag}>`;
 }
 
 /**
@@ -241,7 +272,7 @@ function processParagraphs(html) {
   const result = [];
   let paragraph = [];
 
-  const blockElements = ['<h1', '<h2', '<h3', '<h4', '<h5', '<h6', '<ul', '<ol', '<li', '<table', '<thead', '<tbody', '<tr', '<th', '<td', '<blockquote', '<pre', '<hr', '<div', '</ul', '</ol', '</table', '</thead', '</tbody', '</tr', '</blockquote', '</pre', '</div'];
+  const blockElements = ['<h1', '<h2', '<h3', '<h4', '<h5', '<h6', '<ul', '<ol', '<li', '<table', '<thead', '<tbody', '<tr', '<th', '<td', '<blockquote', '<pre', '<hr', '<div', '</li', '</ul', '</ol', '</table', '</thead', '</tbody', '</tr', '</blockquote', '</pre', '</div'];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
