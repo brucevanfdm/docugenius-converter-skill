@@ -53,11 +53,7 @@ python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 - `extract_images`: `true`/`false`（默认 `true`，仅用于 Office/PDF）
 - `output_dir`: 输出目录（可选，不指定时使用默认位置）
 
-**自动依赖检测**：
-- **首次转换**：脚本会自动检测所需依赖库是否已安装
-- **缓存机制**：检测结果会缓存到 `.claude/cache/docugenius-converter/`，后续转换直接使用缓存，无需重复检测
-- **缺少依赖**：如果缺少依赖，脚本会返回错误信息，提示用户安装
-- **安装依赖**：根据错误提示运行 `pip install <缺失的库>`，或使用安装脚本
+**依赖说明**：脚本自动检测依赖，直接执行转换即可。缺少依赖时会有错误提示。
 
 **默认输出目录**（不指定 `output_dir` 时）：
 - **Office/PDF → Markdown**: 文件同级目录下的 `Markdown/` 文件夹
@@ -84,24 +80,20 @@ python scripts/convert_document.py <file_path> [extract_images] [output_dir]
 
 用户："分析这个 Word 文件的内容"
 
-```bash
-# 1. 转换文档
-python scripts/convert_document.py /path/to/report.docx
+执行转换，解析返回的 JSON 中的 `markdown_content`，分析后向用户展示结果。
 
-# 2. 解析 JSON 结果
-# 3. 使用 markdown_content 进行分析
-# 4. 向用户展示分析结果
+```bash
+python scripts/convert_document.py /path/to/report.docx
 ```
 
 ### 模式 2: Markdown 转 Word
 
 用户："把这个 md 转成 docx"
 
-```bash
-# 1. 检查 Node.js（如未安装会自动提示）
-python scripts/convert_document.py /path/to/document.md
+执行转换，告知用户输出文件路径。
 
-# 2. 告知用户输出路径
+```bash
+python scripts/convert_document.py /path/to/document.md
 ```
 
 ### 模式 3: 批量转换
@@ -175,68 +167,10 @@ pip install pdfplumber   # PDF
 4. PDF 优先使用文本型，扫描型建议先 OCR
 5. 转换后检查输出质量
 
-## 系统要求
-
-- **Python**: 3.6+（必需）
-- **Node.js**: 14+（可选，仅 Markdown 转 Word）
-- **操作系统**: Windows、macOS、Linux
-- **磁盘空间**: 约 50MB
-
 ## 缓存机制
 
-为提高性能，转换脚本使用项目级缓存存储依赖检测结果：
+转换脚本使用项目级缓存存储依赖检测结果（位置：`.claude/cache/docugenius-converter/`）。
 
-### 缓存位置
-```
-<project-root>/.claude/cache/docugenius-converter/dependencies.json
-```
+- **缓存策略**：永不过期，仅在 `requirements.txt` 变更时自动失效
+- **清除缓存**：如需强制重新检测依赖，运行 `python scripts/convert_document.py --clear-cache`
 
-### 缓存策略
-- **缓存有效期**: 永不过期（除非 requirements.txt 变更）
-- **自动失效**: 当 `requirements.txt` 变更时自动失效
-- **首次检测**: 首次转换时会检查依赖并缓存结果
-- **后续转换**: 直接使用缓存，无需重复检测
-
-### 清除缓存
-如需强制重新检测依赖（例如安装了新库），运行：
-```bash
-python scripts/convert_document.py --clear-cache
-```
-
-### 缓存数据结构
-```json
-{
-  "timestamp": 1738493544.123,
-  "requirements_hash": "abc123...",
-  "dependencies": {
-    "python-docx,openpyxl,pdfplumber": {
-      "all_installed": true,
-      "missing": []
-    }
-  }
-}
-```
-
-## 输出目录说明
-
-转换后的文件默认保存在原文件同级目录下的专门文件夹中：
-
-### Office/PDF → Markdown
-```
-原文件目录/
-├── report.docx              # 原始文件
-└── Markdown/                # 输出目录
-    └── report.md            # 转换后的 Markdown
-```
-
-### Markdown → Word
-```
-原文件目录/
-├── document.md              # 原始文件
-└── Word/                    # 输出目录
-    └── document.docx        # 转换后的 Word 文档
-```
-
-**注意事项**：
-- 输出文件夹（`Markdown/` 或 `Word/`）会在不存在时自动创建
-- 如需指定其他输出位置，可在命令中添加 `output_dir` 参数
