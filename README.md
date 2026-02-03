@@ -6,7 +6,10 @@
 [![Python](https://img.shields.io/badge/Python-3.6+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**DocuGenius Converter** 是一个 [Claude Code](https://github.com/anthropics/claude-code) Skill，为 Claude 添加文档格式转换能力。安装后，Claude 可以直接处理 Word、Excel、PowerPoint、PDF 等多种文档格式，将它们转换为 AI 友好的 Markdown 格式进行分析。
+**DocuGenius Converter** 是一个 [Claude Code](https://github.com/anthropics/claude-code) Skill，为 Claude 添加**双向文档转换**能力。安装后，Claude 可以：
+
+- **Office/PDF → Markdown**：将 Word、Excel、PowerPoint、PDF 等文档转换为 AI 友好的 Markdown 格式进行分析
+- **Markdown → Word**：将 Markdown 导出为**排版精美的 Word 文档**，自动应用专业样式和格式
 
 ## 为什么需要这个 Skill？
 
