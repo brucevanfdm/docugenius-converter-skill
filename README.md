@@ -235,12 +235,6 @@ docugenius-converter-skill/
 | python-pptx | ~2MB | PowerPoint 处理 |
 | pdfplumber  | ~5MB | PDF 处理        |
 
-### 缓存机制
-
-- 位置：`.claude/cache/docugenius-converter/`
-- 策略：永不过期，`requirements.txt` 变更时自动失效
-- 清除：`./convert.sh --clear-cache` 或 `python scripts/convert_document.py --clear-cache`
-
 ## 许可证
 
 MIT License

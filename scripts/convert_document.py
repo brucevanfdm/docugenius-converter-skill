@@ -209,7 +209,7 @@ def install_dependencies(pip_packages):
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                newlines=True,
+                text=True,
             )
 
             if result.returncode == 0:
@@ -690,8 +690,7 @@ def convert_md(file_path, output_dir=None):
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            universal_newlines=True,
-            encoding='utf-8',
+            text=True,
             timeout=NODE_CONVERT_TIMEOUT_SECONDS,
             env=env,
         )

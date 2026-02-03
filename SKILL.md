@@ -41,11 +41,11 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 **Claude Code 中的最佳实践**：
 - 在 Windows 环境（包括 Git Bash）中，始终使用 PowerShell 执行：
   ```bash
-  powershell.exe -Command "Set-Location 'C:\Users\Bruce\.claude\skills\docugenius-converter-skill'; .\convert.ps1 'c:\path\to\file.docx'"
+  powershell.exe -Command "Set-Location '<skill-dir>'; .\convert.ps1 'c:\path\to\file.docx'"
   ```
 - 路径中包含空格时，使用单引号包裹
 - 使用 `Set-Location` 而不是 `cd`，避免 PowerShell 语法错误
-- `<skill-dir>` 替换为实际的 skill 目录路径（通常是 `C:\Users\Bruce\VSCodeProject\docugenius-converter-skill`）
+- `<skill-dir>` 替换为实际的 skill 目录路径（例如 `C:\Users\<YourName>\.claude\skills\docugenius-converter-skill`）
 
 ### 命令示例
 
