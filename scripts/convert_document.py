@@ -154,7 +154,9 @@ def _ensure_shared_node_modules(shared_dir, source_dir):
             cwd=shared_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            universal_newlines=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
         )
         if result.returncode != 0:
             error_output = result.stderr.strip() or result.stdout.strip()
@@ -210,6 +212,8 @@ def install_dependencies(pip_packages):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
 
             if result.returncode == 0:
@@ -691,25 +695,30 @@ def convert_md(file_path, output_dir=None):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=NODE_CONVERT_TIMEOUT_SECONDS,
             env=env,
         )
 
         # 解析输出
         try:
-            output = json.loads(result.stdout)
+            stdout_text = result.stdout or ""
+            output = json.loads(stdout_text)
             return output
         except json.JSONDecodeError:
             if result.returncode == 0:
                 return {
                     'success': True,
-                    'output_path': result.stdout.strip(),
+                    'output_path': (result.stdout or "").strip(),
                     'message': '转换成功'
                 }
             else:
+                stdout_text = (result.stdout or "").strip()
+                stderr_text = (result.stderr or "").strip()
                 return {
                     'success': False,
-                    'error': f'Node.js 脚本输出解析失败: {result.stdout}\n{result.stderr}'
+                    'error': f'Node.js 脚本输出解析失败: {stdout_text}\n{stderr_text}'
                 }
 
     except subprocess.TimeoutExpired:
