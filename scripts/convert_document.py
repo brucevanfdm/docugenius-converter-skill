@@ -20,15 +20,11 @@ import importlib
 import re
 import subprocess
 import shutil
-import io
-import time
-import hashlib
 from pathlib import Path
 
 SUPPORTED_EXTENSIONS = ['.docx', '.xlsx', '.pptx', '.pdf', '.md']
 MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
 NODE_CONVERT_TIMEOUT_SECONDS = 120
-CACHE_EXPIRY_SECONDS = None  # 缓存永不过期，仅在 requirements.txt 变更时失效
 
 def _configure_windows_stdio():
     """
@@ -97,6 +93,8 @@ def _configure_windows_stdio():
 
 _configure_windows_stdio()
 
+# ==================== 依赖配置 ====================
+
 _DEPENDENCIES_BY_EXT = {
     '.docx': [('docx', 'python-docx')],
     '.xlsx': [('openpyxl', 'openpyxl')],
@@ -104,128 +102,6 @@ _DEPENDENCIES_BY_EXT = {
     '.pdf': [('pdfplumber', 'pdfplumber')],
     '.md': [],  # Markdown 转 DOCX 使用 Node.js，无 Python 依赖
 }
-
-# ==================== 缓存管理函数 ====================
-
-def _find_project_root(start_dir: Path):
-    """
-    从给定目录开始向上查找项目根目录。
-
-    判定依据（任一命中即可）：
-    - SKILL.md（本仓库特征文件）
-    - requirements.txt
-    - .git（开发态仓库）
-    """
-    try:
-        current = start_dir.resolve()
-    except Exception:
-        current = start_dir
-
-    candidates = [current, *list(getattr(current, "parents", []))]
-    for candidate in candidates:
-        try:
-            if (
-                (candidate / 'SKILL.md').exists()
-                or (candidate / 'requirements.txt').exists()
-                or (candidate / '.git').exists()
-            ):
-                return candidate
-        except Exception:
-            continue
-    return None
-
-def get_cache_dir():
-    """获取项目级缓存目录"""
-    # 优先从当前工作目录向上找项目根目录；否则回退到脚本所在目录向上找；
-    # 再不行（例如从系统目录运行），回退到用户级缓存目录，避免因权限问题导致缓存不可用。
-    project_root = _find_project_root(Path.cwd())
-    if project_root is None:
-        project_root = _find_project_root(Path(__file__).resolve().parent)
-
-    if project_root is not None:
-        cache_dir = project_root / '.claude' / 'cache' / 'docugenius-converter'
-    else:
-        if sys.platform == "win32":
-            base_dir = os.getenv("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
-        else:
-            base_dir = os.getenv("XDG_CACHE_HOME") or str(Path.home() / ".cache")
-        cache_dir = Path(base_dir) / 'docugenius-converter'
-
-    # 创建缓存目录
-    try:
-        cache_dir.mkdir(parents=True, exist_ok=True)
-    except Exception:
-        # 如果无法创建，返回 None（禁用缓存）
-        return None
-
-    return cache_dir
-
-def get_requirements_hash():
-    """计算 requirements.txt 的 hash，用于检测依赖变更"""
-    try:
-        # 尝试找到 requirements.txt（按项目根目录判定，避免工作目录不同导致误判）
-        project_root = _find_project_root(Path(__file__).resolve().parent)
-        if project_root is None:
-            project_root = Path(__file__).resolve().parent.parent
-
-        req_file = project_root / 'requirements.txt'
-
-        if not req_file.exists():
-            return None
-
-        with open(req_file, 'rb') as f:
-            return hashlib.md5(f.read()).hexdigest()
-    except Exception:
-        return None
-
-def load_dependency_cache():
-    """加载依赖缓存"""
-    cache_dir = get_cache_dir()
-    if not cache_dir:
-        return None
-
-    cache_file = cache_dir / 'dependencies.json'
-
-    if not cache_file.exists():
-        return None
-
-    try:
-        with open(cache_file, 'r', encoding='utf-8') as f:
-            cache = json.load(f)
-
-        # 检查缓存是否过期（如果设置了过期时间）
-        if CACHE_EXPIRY_SECONDS is not None:
-            cache_time = cache.get('timestamp', 0)
-            if time.time() - cache_time > CACHE_EXPIRY_SECONDS:
-                return None
-
-        # 检查 requirements.txt 是否变更
-        current_hash = get_requirements_hash()
-        cached_hash = cache.get('requirements_hash')
-        if current_hash and cached_hash != current_hash:
-            return None
-
-        return cache
-    except Exception:
-        return None
-
-def save_dependency_cache(cache_data):
-    """保存依赖缓存"""
-    cache_dir = get_cache_dir()
-    if not cache_dir:
-        return
-
-    cache_file = cache_dir / 'dependencies.json'
-
-    try:
-        # 添加时间戳和 requirements hash
-        cache_data['timestamp'] = time.time()
-        cache_data['requirements_hash'] = get_requirements_hash()
-
-        with open(cache_file, 'w', encoding='utf-8') as f:
-            json.dump(cache_data, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass  # 缓存保存失败不影响主流程
 
 # ==================== 依赖安装函数 ====================
 
@@ -313,12 +189,6 @@ def check_dependencies(file_ext=None, auto_install=True):
     """
     检查必需的依赖是否已安装（默认检查全部；传入 file_ext 时仅检查该格式所需）
 
-    使用项目级缓存提高性能：
-    - 缓存位置：优先 <project>/.claude/cache/docugenius-converter/dependencies.json
-      - 若无法识别项目根目录或无权限写入，则回退到用户级缓存目录（Windows: %LOCALAPPDATA%/docugenius-converter）
-    - 缓存有效期：永不过期（仅在 requirements.txt 变更时失效）
-    - 缓存失效：requirements.txt 变更时自动失效，或手动清除缓存
-
     Args:
         file_ext: 文件扩展名（如 '.docx'），仅检查该格式所需的依赖
         auto_install: 是否自动安装缺失的依赖（默认 True）
@@ -341,21 +211,7 @@ def check_dependencies(file_ext=None, auto_install=True):
             ('pdfplumber', 'pdfplumber'),
         ]
 
-    # 生成缓存键
-    cache_key = ','.join([pip_name for _, pip_name in deps])
-
-    # 尝试从缓存加载
-    cache = load_dependency_cache()
-    if cache and 'dependencies' in cache:
-        cached_deps = cache['dependencies']
-        # 检查缓存中是否包含当前需要的依赖信息
-        if cache_key in cached_deps:
-            cached_result = cached_deps[cache_key]
-            if cached_result.get('all_installed'):
-                return True, None
-            # 缓存显示有缺失依赖，但不清除缓存（因为可能会自动安装）
-
-    # 缓存未命中或缓存显示有缺失，执行实际检查
+    # 检查依赖是否已安装
     missing = []
     missing_pip_names = []
     for module_name, pip_name in deps:
@@ -369,10 +225,7 @@ def check_dependencies(file_ext=None, auto_install=True):
     if missing and auto_install:
         success, error = install_dependencies(missing_pip_names)
         if success:
-            # 安装成功，重新检查（清空缓存以确保使用新安装的包）
-            clear_cache()
-
-            # 重新导入检查
+            # 安装成功，重新检查
             still_missing = []
             for module_name, pip_name in deps:
                 try:
@@ -381,40 +234,14 @@ def check_dependencies(file_ext=None, auto_install=True):
                     still_missing.append(pip_name)
 
             if still_missing:
-                # 安装后仍然缺失
-                result = {'all_installed': False, 'missing': still_missing}
-                cache = cache or {'dependencies': {}}
-                cache['dependencies'][cache_key] = result
-                save_dependency_cache(cache)
                 return False, f"依赖安装后仍无法加载: {', '.join(still_missing)}。请手动安装并检查 Python 环境。"
 
-            # 全部成功
-            result = {'all_installed': True, 'missing': []}
-            cache = cache or {'dependencies': {}}
-            cache['dependencies'][cache_key] = result
-            save_dependency_cache(cache)
             return True, None
         else:
             # 安装失败
             return False, error
 
-    # 构建结果
-    if missing:
-        result = {
-            'all_installed': False,
-            'missing': missing_pip_names
-        }
-    else:
-        result = {
-            'all_installed': True,
-            'missing': []
-        }
-
-    # 保存到缓存
-    cache = cache or {'dependencies': {}}
-    cache['dependencies'][cache_key] = result
-    save_dependency_cache(cache)
-
+    # 有缺失但未启用自动安装
     if missing:
         return False, f"缺少依赖库: {', '.join(missing_pip_names)}。请运行: pip install --user {' '.join(missing_pip_names)}"
 
@@ -968,35 +795,6 @@ def batch_convert(directory, recursive=True, extract_images=True, output_dir=Non
 
     return results
 
-def clear_cache():
-    """清除依赖缓存"""
-    cache_dir = get_cache_dir()
-    if not cache_dir:
-        return {
-            'success': False,
-            'message': '无法获取缓存目录'
-        }
-
-    cache_file = cache_dir / 'dependencies.json'
-
-    if not cache_file.exists():
-        return {
-            'success': True,
-            'message': '缓存不存在，无需清除'
-        }
-
-    try:
-        cache_file.unlink()
-        return {
-            'success': True,
-            'message': f'已清除缓存: {cache_file}'
-        }
-    except Exception as e:
-        return {
-            'success': False,
-            'message': f'清除缓存失败: {str(e)}'
-        }
-
 def main():
     if len(sys.argv) < 2:
         print('用法: python convert_document.py <file_path> [extract_images] [output_dir]')
@@ -1011,16 +809,7 @@ def main():
         print('批量转换: python convert_document.py --batch <directory> [recursive]')
         print('  directory: 要扫描的目录')
         print('  recursive: true/false (默认: true)')
-        print('')
-        print('清除缓存: python convert_document.py --clear-cache')
-        print('  清除依赖检测缓存，强制重新检查依赖')
         sys.exit(1)
-
-    # 清除缓存模式
-    if sys.argv[1] == '--clear-cache':
-        result = clear_cache()
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-        sys.exit(0 if result['success'] else 1)
 
     # 批量转换模式
     if sys.argv[1] == '--batch':
