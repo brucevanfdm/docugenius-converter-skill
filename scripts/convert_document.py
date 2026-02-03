@@ -20,6 +20,7 @@ import importlib
 import re
 import subprocess
 import shutil
+import io
 from pathlib import Path
 
 SUPPORTED_EXTENSIONS = ['.docx', '.xlsx', '.pptx', '.pdf', '.md']
@@ -773,13 +774,13 @@ def batch_convert(directory, recursive=True, extract_images=True, output_dir=Non
 
     if recursive:
         # 递归扫描
-            for root, dirs, files in os.walk(directory):
-                for file in files:
-                    if os.path.splitext(file)[1].lower() in SUPPORTED_EXTENSIONS:
-                        file_path = os.path.join(root, file)
-                        result = convert_document(file_path, extract_images, output_dir)
-                        results.append({
-                            'file': file_path,
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                if os.path.splitext(file)[1].lower() in SUPPORTED_EXTENSIONS:
+                    file_path = os.path.join(root, file)
+                    result = convert_document(file_path, extract_images, output_dir)
+                    results.append({
+                        'file': file_path,
                         'result': result
                     })
     else:
