@@ -1,6 +1,6 @@
 ---
 name: docugenius-converter
-description: Use when user requests document conversion, export, or AI analysis of Office/PDF files. Trigger words: "转换", "convert", "导出", "export", "分析这个文件", or any .docx/.xlsx/.pptx/.pdf/.md file operation.
+description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、PowerPoint (.pptx) 和 PDF (.pdf) 转换为 AI 友好的 Markdown 格式，或将 Markdown (.md) 转换为 Word (.docx) 格式。当用户请求以下操作时使用：(1) 明确请求文档转换，包括任何包含"转换"、"转为"、"转成"、"convert"、"导出"、"export"等词汇的请求（例如："转换文档"、"把这个文件转为docx"、"convert to markdown"、"导出为Word"）；(2) 需要 AI 理解文档内容（"帮我分析这个 Word 文件"、"读取这个 PDF"、"总结这个 Excel"）；(3) 上传文档文件并询问内容（"这是什么"、"帮我看看"）；(4) 任何涉及 .docx、.xlsx、.pptx、.pdf、.md 文件格式转换的请求。
 ---
 # DocuGenius Document Converter
 
@@ -8,11 +8,11 @@ description: Use when user requests document conversion, export, or AI analysis 
 
 ## Quick Reference
 
-| 操作 | 命令 | 输出位置 |
-|------|------|----------|
-| Office/PDF → Markdown | `./convert.sh <file>` | 同目录 `Markdown/` |
-| Markdown → Word | `./convert.sh <file.md>` | 同目录 `Word/` |
-| 批量转换 | `./convert.sh --batch <dir>` | 同上 |
+| 操作                   | 命令                           | 输出位置             |
+| ---------------------- | ------------------------------ | -------------------- |
+| Office/PDF → Markdown | `./convert.sh <file>`        | 同目录 `Markdown/` |
+| Markdown → Word       | `./convert.sh <file.md>`     | 同目录 `Word/`     |
+| 批量转换               | `./convert.sh --batch <dir>` | 同上                 |
 
 ## 工作流程
 
@@ -20,7 +20,10 @@ description: Use when user requests document conversion, export, or AI analysis 
 用户请求转换 → 直接运行 ./convert.sh → 解析 JSON 输出 → 处理结果
 ```
 
-**关键原则**：依赖会自动安装，无需预检查。转换失败时再处理错误。
+**关键原则**：
+1. **不要预先检查任何依赖**（Python 库、Node.js 等）
+2. 直接执行转换命令
+3. 只在转换失败（`success: false`）时才根据错误信息处理
 
 ## 执行命令
 
@@ -56,30 +59,35 @@ description: Use when user requests document conversion, export, or AI analysis 
 
 ## 错误处理
 
-仅在转换失败时处理：
+**仅在转换失败时（返回 `success: false`）才处理错误**：
 
-| 错误 | 解决方案 |
-|------|----------|
-| `缺少依赖库: xxx` | 脚本会自动安装，如失败则手动 `pip install --user xxx` |
-| `文件不存在` | 验证路径，使用绝对路径 |
-| `不支持的文件格式: .doc` | 提示用户先转换为 .docx |
-| `未找到 Node.js` | 仅 Markdown→Word 需要，提示安装 Node.js |
-| `文件过大` | 超过 100MB 限制 |
+| 错误类型                      | 处理方法                                                |
+| ----------------------------- | ------------------------------------------------------- |
+| Python 依赖缺失              | 脚本会自动安装，如失败则运行 `pip install --user xxx` |
+| `未找到 Node.js`             | 仅在 MD→DOCX 转换失败且报此错误时，才提示安装 Node.js  |
+| `Node.js 依赖未安装`         | 在 `scripts/md_to_docx` 目录运行 `npm install`        |
+| `文件不存在`                 | 提示用户验证文件路径                                    |
+| `不支持的文件格式: .doc`     | 提示用户先转换为 .docx                                  |
+| `文件过大`                   | 提示超过 100MB 限制                                      |
 
 ## 支持的格式
 
-| 格式 | 转换方向 | 质量 |
-|------|----------|------|
-| .docx | ↔ | 优秀 |
-| .xlsx | → | 优秀 |
-| .pptx | → | 良好 |
-| .pdf | → | 取决于 PDF 类型 |
-| .md | ↔ | 优秀 |
+| 格式  | 转换方向 | 质量            |
+| ----- | -------- | --------------- |
+| .docx | ↔       | 优秀            |
+| .xlsx | →       | 优秀            |
+| .pptx | →       | 良好            |
+| .pdf  | →       | 取决于 PDF 类型 |
+| .md   | ↔       | 优秀            |
 
 ## 注意事项
 
+**重要：**
+- **绝对不要在执行转换前检查任何依赖**（包括 Python、Node.js、npm 包等）
+- 直接执行转换命令，让脚本自己检测和处理依赖
+- 只在转换失败时才根据返回的错误信息采取行动
+
+其他：
 - 依赖使用项目级缓存，首次检测后无需重复检查
-- 自动安装到用户目录，无需虚拟环境
-- .doc/.xls/.ppt 旧格式需先转换
-
-
+- Python 依赖会自动安装到用户目录，无需虚拟环境
+- .doc/.xls/.ppt 旧格式需先转换为对应的新格式
