@@ -48,7 +48,15 @@ DocuGenius Converter Skill
 pip install --user python-docx openpyxl python-pptx pdfplumber
 
 # Node.js 依赖（可选，仅用于 MD → DOCX）
+# 默认会自动安装到用户级共享目录：
+#   macOS/Linux: ~/.docugenius/node/md_to_docx
+#   Windows:     %LOCALAPPDATA%/DocuGenius/node/md_to_docx
+# 可通过环境变量 DOCUGENIUS_NODE_HOME 指定共享目录
+#
+# 方案 A：本地安装（当前项目）
 cd scripts/md_to_docx && npm install
+# 方案 B：共享安装（用户目录）
+# cd ~/.docugenius/node/md_to_docx && npm install
 
 ----------------------------------------
 使用方法

@@ -44,8 +44,16 @@ echo.
 echo   pip install --user python-docx openpyxl python-pptx pdfplumber
 echo.
 echo   REM Node.js 依赖（可选，仅用于 MD 转 DOCX）
+echo   REM 默认会自动安装到用户级共享目录：
+echo   REM   Windows: %%LOCALAPPDATA%%\DocuGenius\node\md_to_docx
+echo   REM 可通过环境变量 DOCUGENIUS_NODE_HOME 指定共享目录
+echo   REM
+echo   REM 方案 A：本地安装（当前项目）
 echo   cd scripts\md_to_docx
 echo   npm install
+echo   REM 方案 B：共享安装（用户目录）
+echo   REM cd %%LOCALAPPDATA%%\DocuGenius\node\md_to_docx
+echo   REM npm install
 echo.
 echo ----------------------------------------
 echo 使用方法

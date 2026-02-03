@@ -26,6 +26,7 @@ from pathlib import Path
 SUPPORTED_EXTENSIONS = ['.docx', '.xlsx', '.pptx', '.pdf', '.md']
 MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
 NODE_CONVERT_TIMEOUT_SECONDS = 120
+NODE_SHARED_HOME_ENV = "DOCUGENIUS_NODE_HOME"
 
 def _configure_windows_stdio():
     """
@@ -103,6 +104,65 @@ _DEPENDENCIES_BY_EXT = {
     '.pdf': [('pdfplumber', 'pdfplumber')],
     '.md': [],  # Markdown 转 DOCX 使用 Node.js，无 Python 依赖
 }
+
+# ==================== Node.js 共享依赖目录 ====================
+
+def _get_node_shared_root():
+    override = os.environ.get(NODE_SHARED_HOME_ENV)
+    if override:
+        return override
+
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        if not base:
+            base = os.path.join(os.path.expanduser("~"), "AppData", "Local")
+        return os.path.join(base, "DocuGenius", "node")
+
+    return os.path.join(os.path.expanduser("~"), ".docugenius", "node")
+
+def _sync_shared_package_files(source_dir, target_dir):
+    for filename in ("package.json", "package-lock.json"):
+        src = os.path.join(source_dir, filename)
+        if not os.path.exists(src):
+            continue
+        dst = os.path.join(target_dir, filename)
+        try:
+            shutil.copy2(src, dst)
+        except Exception as e:
+            return False, f"无法复制 {filename} 到共享目录: {str(e)}"
+    return True, None
+
+def _ensure_shared_node_modules(shared_dir, source_dir):
+    npm_cmd = shutil.which('npm')
+    if not npm_cmd:
+        return False, "未找到 npm。请安装 Node.js（自带 npm）后重试。"
+
+    try:
+        os.makedirs(shared_dir, exist_ok=True)
+    except Exception as e:
+        return False, f"无法创建共享依赖目录: {str(e)}"
+
+    ok, err = _sync_shared_package_files(source_dir, shared_dir)
+    if not ok:
+        return False, err
+
+    cmd = [npm_cmd, "install", "--no-fund", "--no-audit"]
+    try:
+        print("[DocuGenius] 正在安装 Node.js 依赖到用户共享目录...", file=sys.stderr)
+        result = subprocess.run(
+            cmd,
+            cwd=shared_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+        )
+        if result.returncode != 0:
+            error_output = result.stderr.strip() or result.stdout.strip()
+            return False, f"Node.js 依赖安装失败: {error_output}"
+    except Exception as e:
+        return False, f"Node.js 依赖安装失败: {str(e)}"
+
+    return True, None
 
 # ==================== 依赖安装函数 ====================
 
@@ -589,19 +649,42 @@ def convert_md(file_path, output_dir=None):
             'error': f'Node.js 转换脚本不存在: {node_script}。请运行 npm install 安装依赖。'
         }
 
-    # 检查 node_modules 是否存在
-    node_modules = os.path.join(script_dir, 'md_to_docx', 'node_modules')
-    if not os.path.exists(node_modules):
-        return {
-            'success': False,
-            'error': f'Node.js 依赖未安装。请在 {os.path.join(script_dir, "md_to_docx")} 目录下运行: npm install'
-        }
+    source_dir = os.path.join(script_dir, 'md_to_docx')
+    local_node_modules = os.path.join(source_dir, 'node_modules')
+    shared_root = _get_node_shared_root()
+    shared_dir = os.path.join(shared_root, 'md_to_docx')
+    shared_node_modules = os.path.join(shared_dir, 'node_modules')
+
+    use_shared = False
+    if not os.path.exists(local_node_modules):
+        if not os.path.exists(shared_node_modules):
+            ok, err = _ensure_shared_node_modules(shared_dir, source_dir)
+            if not ok:
+                return {
+                    'success': False,
+                    'error': (
+                        f"{err}\n"
+                        f"可手动安装：\n"
+                        f"  1) 本地安装：cd {source_dir} && npm install\n"
+                        f"  2) 共享安装：cd {shared_dir} && npm install\n"
+                        f"可通过环境变量 {NODE_SHARED_HOME_ENV} 指定共享目录。"
+                    )
+                }
+        use_shared = True
 
     try:
         # 调用 Node.js 脚本
         cmd = [node_cmd, node_script, file_path]
         if output_dir:
             cmd.append(output_dir)
+
+        env = os.environ.copy()
+        if use_shared:
+            existing = env.get("NODE_PATH")
+            if existing:
+                env["NODE_PATH"] = os.pathsep.join([shared_node_modules, existing])
+            else:
+                env["NODE_PATH"] = shared_node_modules
 
         result = subprocess.run(
             cmd,
@@ -610,6 +693,7 @@ def convert_md(file_path, output_dir=None):
             universal_newlines=True,
             encoding='utf-8',
             timeout=NODE_CONVERT_TIMEOUT_SECONDS,
+            env=env,
         )
 
         # 解析输出

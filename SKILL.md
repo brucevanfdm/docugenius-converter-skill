@@ -85,7 +85,7 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 | ----------------------------- | ------------------------------------------------------- |
 | Python 依赖缺失              | 脚本会自动安装，如失败则运行 `pip install --user xxx` |
 | `未找到 Node.js`             | 仅在 MD→DOCX 转换失败且报此错误时，才提示安装 Node.js  |
-| `Node.js 依赖未安装`         | 在 `scripts/md_to_docx` 目录运行 `npm install`        |
+| `Node.js 依赖未安装`         | 脚本会自动安装到用户级共享目录；失败时在 `scripts/md_to_docx` 或共享目录运行 `npm install` |
 | `文件不存在`                 | 提示用户验证文件路径                                    |
 | `不支持的文件格式: .doc`     | 提示用户先转换为 .docx                                  |
 | `文件过大`                   | 提示超过 100MB 限制                                      |
@@ -109,4 +109,6 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 
 其他：
 - Python 依赖会自动安装到用户目录
+- Node.js 依赖会自动安装到用户级共享目录（可用 `DOCUGENIUS_NODE_HOME` 指定）
+- 默认共享目录：macOS/Linux `~/.docugenius/node/md_to_docx`，Windows `%LOCALAPPDATA%\DocuGenius\node\md_to_docx`
 - .doc/.xls/.ppt 旧格式需先转换为对应的新格式
