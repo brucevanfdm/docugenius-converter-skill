@@ -1,12 +1,12 @@
 # DocuGenius Converter Skill
 
-> 为 Claude Code 添加双向文档转换能力
+> 为 Claude Agent 添加双向文档转换能力
 
-[![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-purple.svg)](https://github.com/anthropics/claude-code)
+[![Agent Skill](https://img.shields.io/badge/Agent_Skill-Skill-purple.svg)](https://github.com/anthropics/claude-code)
 [![Python](https://img.shields.io/badge/Python-3.6+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**DocuGenius Converter** 是一个 [Claude Code](https://github.com/anthropics/claude-code) Skill，为 Claude 添加**双向文档转换**能力。安装后，Claude 可以：
+**DocuGenius Converter** 是一个 **Agent Skill**，为 Claude 添加**双向文档转换**能力。安装后，Claude 可以：
 
 - **Office/PDF → Markdown**：将 Word、Excel、PowerPoint、PDF 等文档转换为 AI 友好的 Markdown 格式进行分析
 - **Markdown → Word**：将 Markdown 导出为**排版精美的 Word 文档**，自动应用专业样式和格式
@@ -41,7 +41,6 @@ Claude Code 默认只能直接读取 Markdown 和纯文本文件。当你上传 
 
 - 总依赖仅 10-15MB
 - 按需加载，只检测当前文件类型所需的库
-- 智能缓存，避免重复检查依赖
 - **自动安装**：首次运行时自动安装依赖到用户目录
 
 ## 安装
