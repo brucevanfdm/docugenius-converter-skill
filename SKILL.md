@@ -11,7 +11,7 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 | 操作                   | 命令                           | 输出位置             |
 | ---------------------- | ------------------------------ | -------------------- |
 | Office/PDF → Markdown | `./convert.sh <file>`        | 同目录 `Markdown/` |
-| Markdown → Word       | `./convert.sh <file.md>`     | 项目根目录 `Word/` |
+| Markdown → Word       | `./convert.sh <file.md>`     | 同目录 `Word/`     |
 | 批量转换               | `./convert.sh --batch <dir>` | 同上                 |
 
 ## 工作流程
