@@ -85,9 +85,30 @@ npm install
 
 ## 使用方式
 
+### 跨平台执行说明
+
+根据你的操作系统和环境，选择合适的执行方式：
+
+| 环境 | 推荐命令 | 说明 |
+|------|---------|------|
+| **Linux/macOS** | `./convert.sh <file>` | 直接执行 Shell 脚本 |
+| **Windows PowerShell** | `.\convert.ps1 <file>` | 推荐方式，支持 UTF-8 编码 |
+| **Windows Git Bash** | `powershell.exe -Command "Set-Location '<skill-dir>'; .\convert.ps1 '<file>'"` | 在 Git Bash 中调用 PowerShell |
+| **Windows CMD** | `convert.bat <file>` | 传统方式，可能有编码问题 |
+
+**在 Claude Code 中使用**：
+
+Claude Code 在 Windows 环境中通常运行在 Git Bash 中，因此推荐使用 PowerShell 方式：
+
+```bash
+powershell.exe -Command "Set-Location 'C:\Users\Bruce\VSCodeProject\docugenius-converter-skill'; .\convert.ps1 'c:\path\to\file.docx'"
+```
+
+### 对话示例
+
 安装 Skill 后，在 Claude Code 中直接与 Claude 对话即可：
 
-### 分析文档
+#### 分析文档
 
 ```
 帮我分析这个 report.docx 的内容
@@ -188,7 +209,8 @@ npm install
 docugenius-converter-skill/
 ├── SKILL.md                 # Claude Code Skill 定义
 ├── convert.sh               # 便捷运行脚本 (macOS/Linux)
-├── convert.bat              # 便捷运行脚本 (Windows)
+├── convert.bat              # 便捷运行脚本 (Windows CMD)
+├── convert.ps1              # 便捷运行脚本 (Windows PowerShell，推荐)
 ├── requirements.txt         # Python 依赖（参考）
 ├── scripts/
 │   ├── convert_document.py  # 转换脚本核心（支持自动安装依赖）

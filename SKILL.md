@@ -27,6 +27,28 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 
 ## 执行命令
 
+### 跨平台执行方式
+
+**重要**：根据运行环境选择正确的执行方式：
+
+| 环境 | 推荐命令 | 说明 |
+|------|---------|------|
+| **Linux/macOS** | `./convert.sh <file>` | 直接执行 Shell 脚本 |
+| **Windows PowerShell** | `powershell.exe -Command "cd '<skill-dir>' && .\convert.ps1 '<file>'"` | 推荐方式，支持 UTF-8 编码 |
+| **Windows Git Bash** | `powershell.exe -Command "cd '<skill-dir>' && .\convert.ps1 '<file>'"` | 在 Git Bash 中调用 PowerShell |
+| **Windows CMD** | `convert.bat <file>` | 传统方式，可能有编码问题 |
+
+**Claude Code 中的最佳实践**：
+- 在 Windows 环境（包括 Git Bash）中，始终使用 PowerShell 执行：
+  ```bash
+  powershell.exe -Command "Set-Location 'C:\Users\Bruce\.claude\skills\docugenius-converter-skill'; .\convert.ps1 'c:\path\to\file.docx'"
+  ```
+- 路径中包含空格时，使用单引号包裹
+- 使用 `Set-Location` 而不是 `cd`，避免 PowerShell 语法错误
+- `<skill-dir>` 替换为实际的 skill 目录路径（通常是 `C:\Users\Bruce\VSCodeProject\docugenius-converter-skill`）
+
+### 命令示例
+
 ```bash
 # 单文件转换（依赖自动安装）
 ./convert.sh /path/to/document.docx
@@ -37,8 +59,6 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 # 批量转换
 ./convert.sh --batch /path/to/documents
 ```
-
-**Windows 用户**：使用 `convert.bat` 替代 `./convert.sh`
 
 ## 解析输出
 
