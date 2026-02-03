@@ -4,14 +4,14 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 ---
 # DocuGenius Document Converter
 
-双向文档转换，自动处理依赖安装和缓存。
+缓存。双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、PowerPoint (.pptx) 和 PDF (.pdf) 转换为 AI 友好的 Markdown 格式，或将 Markdown (.md) 转换为 Word (.docx) 格式。
 
 ## Quick Reference
 
 | 操作                   | 命令                           | 输出位置             |
 | ---------------------- | ------------------------------ | -------------------- |
 | Office/PDF → Markdown | `./convert.sh <file>`        | 同目录 `Markdown/` |
-| Markdown → Word       | `./convert.sh <file.md>`     | 同目录 `Word/`     |
+| Markdown → Word       | `./convert.sh <file.md>`     | 项目根目录 `Word/` |
 | 批量转换               | `./convert.sh --batch <dir>` | 同上                 |
 
 ## 工作流程
@@ -21,6 +21,7 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 ```
 
 **关键原则**：
+
 1. **不要预先检查任何依赖**（Python 库、Node.js 等）
 2. 直接执行转换命令
 3. 只在转换失败（`success: false`）时才根据错误信息处理
@@ -31,14 +32,15 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 
 **重要**：根据运行环境选择正确的执行方式：
 
-| 环境 | 推荐命令 | 说明 |
-|------|---------|------|
-| **Linux/macOS** | `./convert.sh <file>` | 直接执行 Shell 脚本 |
-| **Windows PowerShell** | `powershell.exe -Command "cd '<skill-dir>' && .\convert.ps1 '<file>'"` | 推荐方式，支持 UTF-8 编码 |
-| **Windows Git Bash** | `powershell.exe -Command "cd '<skill-dir>' && .\convert.ps1 '<file>'"` | 在 Git Bash 中调用 PowerShell |
-| **Windows CMD** | `convert.bat <file>` | 传统方式，可能有编码问题 |
+| 环境                         | 推荐命令                                                                 | 说明                          |
+| ---------------------------- | ------------------------------------------------------------------------ | ----------------------------- |
+| **Linux/macOS**        | `./convert.sh <file>`                                                  | 直接执行 Shell 脚本           |
+| **Windows PowerShell** | `powershell.exe -Command "cd '<skill-dir>' && .\convert.ps1 '<file>'"` | 推荐方式，支持 UTF-8 编码     |
+| **Windows Git Bash**   | `powershell.exe -Command "cd '<skill-dir>' && .\convert.ps1 '<file>'"` | 在 Git Bash 中调用 PowerShell |
+| **Windows CMD**        | `convert.bat <file>`                                                   | 传统方式，可能有编码问题      |
 
 **Claude Code 中的最佳实践**：
+
 - 在 Windows 环境（包括 Git Bash）中，始终使用 PowerShell 执行：
   ```bash
   powershell.exe -Command "Set-Location '<skill-dir>'; .\convert.ps1 'c:\path\to\file.docx'"
@@ -81,14 +83,14 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 
 **仅在转换失败时（返回 `success: false`）才处理错误**：
 
-| 错误类型                      | 处理方法                                                |
-| ----------------------------- | ------------------------------------------------------- |
-| Python 依赖缺失              | 脚本会自动安装，如失败则运行 `pip install --user xxx` |
-| `未找到 Node.js`             | 仅在 MD→DOCX 转换失败且报此错误时，才提示安装 Node.js  |
-| `Node.js 依赖未安装`         | 脚本会自动安装到用户级共享目录；失败时在 `scripts/md_to_docx` 或共享目录运行 `npm install` |
-| `文件不存在`                 | 提示用户验证文件路径                                    |
-| `不支持的文件格式: .doc`     | 提示用户先转换为 .docx                                  |
-| `文件过大`                   | 提示超过 100MB 限制                                      |
+| 错误类型                   | 处理方法                                                                                       |
+| -------------------------- | ---------------------------------------------------------------------------------------------- |
+| Python 依赖缺失            | 脚本会自动安装，如失败则运行 `pip install --user xxx`                                        |
+| `未找到 Node.js`         | 仅在 MD→DOCX 转换失败且报此错误时，才提示安装 Node.js                                         |
+| `Node.js 依赖未安装`     | 脚本会自动安装到用户级共享目录；失败时在 `scripts/md_to_docx` 或共享目录运行 `npm install` |
+| `文件不存在`             | 提示用户验证文件路径                                                                           |
+| `不支持的文件格式: .doc` | 提示用户先转换为 .docx                                                                         |
+| `文件过大`               | 提示超过 100MB 限制                                                                            |
 
 ## 支持的格式
 
@@ -103,11 +105,13 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 ## 注意事项
 
 **重要：**
+
 - **绝对不要在执行转换前检查任何依赖**（包括 Python、Node.js、npm 包等）
 - 直接执行转换命令，让脚本自己检测和处理依赖
 - 只在转换失败时才根据返回的错误信息采取行动
 
 其他：
+
 - Python 依赖会自动安装到用户目录
 - Node.js 依赖会自动安装到用户级共享目录（可用 `DOCUGENIUS_NODE_HOME` 指定）
 - 默认共享目录：macOS/Linux `~/.docugenius/node/md_to_docx`，Windows `%LOCALAPPDATA%\DocuGenius\node\md_to_docx`
