@@ -13,7 +13,8 @@ function markdownToHTML(markdown) {
     return '';
   }
 
-  let html = markdown;
+  // 统一换行符，避免不同平台导致的列表解析失败
+  let html = markdown.replace(/\r\n?/g, '\n');
 
   // 1. 首先保护代码块
   const codeBlocks = [];

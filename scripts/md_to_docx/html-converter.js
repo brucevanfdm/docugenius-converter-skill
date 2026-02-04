@@ -199,7 +199,11 @@ function convertList(listElement, level = 0) {
   const reference = isOrdered ? "numbered-list" : "bullet-list";
   const safeLevel = Math.min(level, MAX_LIST_LEVEL);
 
-  const listItems = listElement.querySelectorAll(':scope > li');
+  // 避免 :scope 在部分环境兼容性不佳，手动筛选直接子元素
+  const listItems = Array.from(listElement.childNodes).filter(child =>
+    child.nodeType === NODE_TYPE.ELEMENT_NODE &&
+    child.nodeName.toUpperCase() === 'LI'
+  );
   for (const li of listItems) {
     let hasNumberedParagraph = false;
     let currentRuns = [];
