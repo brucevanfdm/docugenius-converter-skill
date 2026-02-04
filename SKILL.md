@@ -8,16 +8,20 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 
 ## Quick Reference
 
+**Linux/macOS:**
+
 | 操作                   | 命令                           | 输出位置             |
 | ---------------------- | ------------------------------ | -------------------- |
-| Office/PDF → Markdown | `./convert.sh <file>`        | 同目录 `Markdown/` |
-| Markdown → Word       | `./convert.sh <file.md>`     | 同目录 `Word/`     |
-| 批量转换               | `./convert.sh --batch <dir>` | 同上                 |
+| Office/PDF → Markdown | `bash convert.sh <file>`        | 同目录 `Markdown/` |
+| Markdown → Word       | `bash convert.sh <file.md>`     | 同目录 `Word/`     |
+| 批量转换               | `bash convert.sh --batch <dir>` | 同上                 |
+
+**Windows:** 见下方 [跨平台执行方式](#跨平台执行方式)
 
 ## 工作流程
 
 ```
-用户请求转换 → 直接运行 ./convert.sh → 解析 JSON 输出 → 处理结果
+用户请求转换 → 直接运行 bash convert.sh → 解析 JSON 输出 → 处理结果
 ```
 
 **关键原则**：
@@ -34,7 +38,7 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 
 | 环境                         | 推荐命令                                                                 | 说明                          |
 | ---------------------------- | ------------------------------------------------------------------------ | ----------------------------- |
-| **Linux/macOS**        | `./convert.sh <file>`                                                  | 直接执行 Shell 脚本           |
+| **Linux/macOS**        | `bash convert.sh <file>`                                                  | 使用 bash 执行（无需执行权限） |
 | **Windows PowerShell** | `powershell.exe -Command "cd '<skill-dir>' && .\convert.ps1 '<file>'"` | 推荐方式，支持 UTF-8 编码     |
 | **Windows Git Bash**   | `powershell.exe -Command "cd '<skill-dir>' && .\convert.ps1 '<file>'"` | 在 Git Bash 中调用 PowerShell |
 | **Windows CMD**        | `convert.bat <file>`                                                   | 传统方式，可能有编码问题      |
@@ -53,13 +57,13 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 
 ```bash
 # 单文件转换（依赖自动安装）
-./convert.sh /path/to/document.docx
+bash convert.sh /path/to/document.docx
 
 # 自定义输出目录
-./convert.sh /path/to/file.pdf true /custom/output
+bash convert.sh /path/to/file.pdf true /custom/output
 
 # 批量转换
-./convert.sh --batch /path/to/documents
+bash convert.sh --batch /path/to/documents
 ```
 
 ## 解析输出
