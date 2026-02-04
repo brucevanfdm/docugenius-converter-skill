@@ -14,6 +14,8 @@ const NODE_TYPE = {
   ELEMENT_NODE: 1
 };
 
+const MAX_LIST_LEVEL = 4;
+
 /**
  * 将 HTML 字符串转换为 docx 组件数组
  * @param {string} htmlString - HTML 字符串
@@ -195,24 +197,61 @@ function convertList(listElement, level = 0) {
   const paragraphs = [];
   const isOrdered = listElement.nodeName === 'OL';
   const reference = isOrdered ? "numbered-list" : "bullet-list";
+  const safeLevel = Math.min(level, MAX_LIST_LEVEL);
 
   const listItems = listElement.querySelectorAll(':scope > li');
   for (const li of listItems) {
-    // 检查是否有嵌套列表
-    const nestedList = li.querySelector(':scope > ul, :scope > ol');
+    let hasNumberedParagraph = false;
+    let currentRuns = [];
 
-    // 获取列表项的直接文本内容
-    const runs = convertInlineNodes(li.childNodes, true);
+    const appendParagraph = (runs, numbered) => {
+      if (runs.length === 0 && !numbered) return;
+      const options = {
+        children: runs.length > 0 ? runs : [new TextRun('')]
+      };
 
-    paragraphs.push(new Paragraph({
-      children: runs.length > 0 ? runs : [new TextRun('')],
-      numbering: { reference: reference, level: level }
-    }));
+      if (numbered) {
+        options.numbering = { reference: reference, level: safeLevel };
+      } else {
+        // 列表项续行：缩进以对齐列表文本
+        options.indent = { left: 720 + safeLevel * 720 };
+      }
 
-    // 处理嵌套列表
-    if (nestedList) {
-      const nestedParagraphs = convertList(nestedList, level + 1);
-      paragraphs.push(...nestedParagraphs);
+      paragraphs.push(new Paragraph(options));
+      if (numbered) {
+        hasNumberedParagraph = true;
+      }
+    };
+
+    const flushRuns = (numbered) => {
+      if (currentRuns.length === 0 && !numbered) return;
+      appendParagraph(currentRuns, numbered);
+      currentRuns = [];
+    };
+
+    for (const child of li.childNodes) {
+      if (child.nodeType === NODE_TYPE.ELEMENT_NODE) {
+        const tagName = child.nodeName.toUpperCase();
+        if (tagName === 'UL' || tagName === 'OL') {
+          if (!hasNumberedParagraph) {
+            flushRuns(true);
+          } else if (currentRuns.length > 0) {
+            flushRuns(false);
+          }
+
+          const nestedParagraphs = convertList(child, level + 1);
+          paragraphs.push(...nestedParagraphs);
+          continue;
+        }
+      }
+
+      currentRuns.push(...convertInlineNodes([child], true));
+    }
+
+    if (!hasNumberedParagraph) {
+      flushRuns(true);
+    } else if (currentRuns.length > 0) {
+      flushRuns(false);
     }
   }
 

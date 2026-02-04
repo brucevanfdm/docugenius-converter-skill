@@ -276,6 +276,28 @@ function createNumbering() {
                 indent: { left: 2160, hanging: 360 }
               }
             }
+          },
+          {
+            level: 3,
+            format: LevelFormat.BULLET,
+            text: "▫",
+            alignment: AlignmentType.LEFT,
+            style: {
+              paragraph: {
+                indent: { left: 2880, hanging: 360 }
+              }
+            }
+          },
+          {
+            level: 4,
+            format: LevelFormat.BULLET,
+            text: "–",
+            alignment: AlignmentType.LEFT,
+            style: {
+              paragraph: {
+                indent: { left: 3600, hanging: 360 }
+              }
+            }
           }
         ]
       },
@@ -312,6 +334,28 @@ function createNumbering() {
             style: {
               paragraph: {
                 indent: { left: 2160, hanging: 360 }
+              }
+            }
+          },
+          {
+            level: 3,
+            format: LevelFormat.DECIMAL,
+            text: "%4.",
+            alignment: AlignmentType.LEFT,
+            style: {
+              paragraph: {
+                indent: { left: 2880, hanging: 360 }
+              }
+            }
+          },
+          {
+            level: 4,
+            format: LevelFormat.DECIMAL,
+            text: "%5.",
+            alignment: AlignmentType.LEFT,
+            style: {
+              paragraph: {
+                indent: { left: 3600, hanging: 360 }
               }
             }
           }

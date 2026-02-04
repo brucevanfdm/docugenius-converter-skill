@@ -162,6 +162,36 @@ function processLists(html) {
     const olMatch = line.match(/^(\s*)\d+\.\s+(.+)$/);
 
     if (!ulMatch && !olMatch) {
+      if (stack.length > 0) {
+        const trimmedLine = line.trim();
+        if (trimmedLine === '') {
+          // 列表内空行：保持列表不关闭
+          continue;
+        }
+
+        const lineIndent = countLeadingSpaces(line);
+
+        // 如果是从更深层级缩进回退，先关闭嵌套列表
+        while (stack.length > 1 && lineIndent <= stack[stack.length - 1].indent) {
+          const top = stack[stack.length - 1];
+          if (top.hasOpenLi) {
+            result.push('</li>');
+            top.hasOpenLi = false;
+          }
+          result.push(`</${top.type}>`);
+          stack.pop();
+        }
+
+        if (stack.length > 0) {
+          const current = stack[stack.length - 1];
+          if (lineIndent > current.indent && current.hasOpenLi) {
+            // 视为当前列表项的续行，避免打断嵌套结构
+            result.push(`<br>${trimmedLine}`);
+            continue;
+          }
+        }
+      }
+
       closeAll();
       result.push(line);
       continue;
