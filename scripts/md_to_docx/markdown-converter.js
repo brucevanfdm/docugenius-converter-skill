@@ -3,12 +3,14 @@
  * 简化版 Markdown 解析器，支持常见语法
  */
 
+const { renderMermaidToDataUrl } = require('./mermaid-renderer');
+
 /**
  * 将 Markdown 文本转换为 HTML
  * @param {string} markdown - Markdown 文本
- * @returns {string} HTML 字符串
+ * @returns {Promise<string>} HTML 字符串
  */
-function markdownToHTML(markdown) {
+async function markdownToHTML(markdown) {
   if (!markdown || typeof markdown !== 'string') {
     return '';
   }
@@ -18,7 +20,7 @@ function markdownToHTML(markdown) {
 
   // 1. 首先保护代码块
   const codeBlocks = [];
-  html = html.replace(/```(\w*)\s*\n([\s\S]*?)```/g, (match, lang, code) => {
+  html = html.replace(/```([^\n`]*)\s*\n([\s\S]*?)```/g, (match, lang, code) => {
     const placeholder = `\x00CODEBLOCK${codeBlocks.length}\x00`;
     codeBlocks.push({ lang: lang || '', code: code.trim() });
     return placeholder;
@@ -64,14 +66,11 @@ function markdownToHTML(markdown) {
   // 处理水平线
   html = html.replace(/^(-{3,}|_{3,}|\*{3,})$/gm, '<hr>');
 
-  // 处理链接 [text](url)
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-
   // 处理图片 ![alt](url)
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
 
-  // 处理段落
-  html = processParagraphs(html);
+  // 处理链接 [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
 
   // 恢复行内代码
   inlineCodes.forEach((code, i) => {
@@ -79,9 +78,37 @@ function markdownToHTML(markdown) {
   });
 
   // 恢复代码块
-  codeBlocks.forEach((block, i) => {
-    html = html.replace(`\x00CODEBLOCK${i}\x00`, () => `<pre><code class="language-${block.lang}">${escapeHTML(block.code)}</code></pre>`);
-  });
+  for (let i = 0; i < codeBlocks.length; i++) {
+    const block = codeBlocks[i];
+    const language = (block.lang || '').trim().toLowerCase();
+
+    if (language === 'mermaid') {
+      const rendered = await renderMermaidToDataUrl(block.code);
+      if (rendered.success) {
+        const widthAttr = Number.isFinite(rendered.width) && rendered.width > 0 ? ` width="${rendered.width}"` : '';
+        const heightAttr = Number.isFinite(rendered.height) && rendered.height > 0 ? ` height="${rendered.height}"` : '';
+        html = html.replace(
+          `\x00CODEBLOCK${i}\x00`,
+          () => `<div><img src="${rendered.dataUrl}" alt="Mermaid Diagram"${widthAttr}${heightAttr}></div>`
+        );
+      } else {
+        html = html.replace(
+          `\x00CODEBLOCK${i}\x00`,
+          () => `<pre><code class="language-mermaid">${escapeHTML(block.code)}</code></pre>`
+        );
+      }
+      continue;
+    }
+
+    const safeLang = (block.lang || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    html = html.replace(
+      `\x00CODEBLOCK${i}\x00`,
+      () => `<pre><code class="language-${safeLang}">${escapeHTML(block.code)}</code></pre>`
+    );
+  }
+
+  // 处理段落（放在最后，避免把代码块/图表包进段落）
+  html = processParagraphs(html);
 
   return html;
 }

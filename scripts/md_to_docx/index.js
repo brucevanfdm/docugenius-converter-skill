@@ -29,7 +29,7 @@ async function convertMarkdownToDocx(inputPath, outputDir) {
     const markdown = fs.readFileSync(inputPath, 'utf-8');
 
     // Markdown -> HTML
-    const html = markdownToHTML(markdown);
+    const html = await markdownToHTML(markdown);
 
     // HTML -> DOCX 组件
     const docxChildren = convertHTMLToDocx(html);

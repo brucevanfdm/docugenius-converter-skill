@@ -5,7 +5,9 @@
  */
 
 const { JSDOM } = require('jsdom');
-const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, VerticalAlign } = require('docx');
+const fs = require('fs');
+const path = require('path');
+const { Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, VerticalAlign } = require('docx');
 const { charsToTwips } = require('./styles');
 
 // Node 类型常量
@@ -15,6 +17,30 @@ const NODE_TYPE = {
 };
 
 const MAX_LIST_LEVEL = 4;
+const MAX_IMAGE_WIDTH_PX = 560;
+const DEFAULT_IMAGE_HEIGHT_PX = 280;
+const SVG_FALLBACK_PIXEL = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6N6t0AAAAASUVORK5CYII=',
+  'base64'
+);
+
+const MIME_TO_IMAGE_TYPE = {
+  'image/png': 'png',
+  'image/jpg': 'jpg',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/bmp': 'bmp',
+  'image/svg+xml': 'svg'
+};
+
+const EXT_TO_IMAGE_TYPE = {
+  '.png': 'png',
+  '.jpg': 'jpg',
+  '.jpeg': 'jpg',
+  '.gif': 'gif',
+  '.bmp': 'bmp',
+  '.svg': 'svg'
+};
 
 /**
  * 将 HTML 字符串转换为 docx 组件数组
@@ -175,6 +201,15 @@ function convertCodeBlock(preElement) {
 function convertImage(imgElement) {
   const alt = imgElement.getAttribute('alt') || '';
   const src = imgElement.getAttribute('src') || '';
+  const imageRun = createImageRun(imgElement);
+
+  if (imageRun) {
+    return new Paragraph({
+      children: [imageRun],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 200, after: 200 }
+    });
+  }
 
   let description = '[图片]';
   if (alt) {
@@ -188,6 +223,174 @@ function convertImage(imgElement) {
     children: [new TextRun({ text: description, italics: true, color: "6B7280" })],
     spacing: { before: 200, after: 200 }
   });
+}
+
+function createImageRun(imgElement) {
+  const src = (imgElement.getAttribute('src') || '').trim();
+  if (!src) return null;
+
+  const imageData = parseDataImage(src) || parseLocalImage(src);
+  if (!imageData) return null;
+
+  const transformation = computeImageTransformation(imgElement, imageData);
+
+  if (imageData.type === 'svg') {
+    return new ImageRun({
+      type: 'svg',
+      data: imageData.data,
+      fallback: {
+        type: 'png',
+        data: SVG_FALLBACK_PIXEL
+      },
+      transformation
+    });
+  }
+
+  return new ImageRun({
+    type: imageData.type,
+    data: imageData.data,
+    transformation
+  });
+}
+
+function parseDataImage(src) {
+  const match = src.match(/^data:(image\/[a-zA-Z0-9.+-]+)(;[^,]*)?,([\s\S]+)$/i);
+  if (!match) return null;
+
+  const mime = match[1].toLowerCase();
+  const metadata = match[2] || '';
+  const payload = match[3] || '';
+  const imageType = MIME_TO_IMAGE_TYPE[mime];
+
+  if (!imageType) {
+    return null;
+  }
+
+  let buffer;
+  if (metadata.toLowerCase().includes(';base64')) {
+    buffer = Buffer.from(payload, 'base64');
+  } else {
+    try {
+      buffer = Buffer.from(decodeURIComponent(payload), 'utf-8');
+    } catch (error) {
+      return null;
+    }
+  }
+
+  if (!buffer.length) {
+    return null;
+  }
+
+  return {
+    type: imageType,
+    data: buffer,
+    svgMeta: imageType === 'svg' ? parseSvgMeta(buffer.toString('utf-8')) : null
+  };
+}
+
+function parseLocalImage(src) {
+  if (/^https?:\/\//i.test(src)) return null;
+  if (src.startsWith('data:')) return null;
+
+  let localPath = src;
+
+  if (src.startsWith('file://')) {
+    try {
+      const fileUrl = new URL(src);
+      localPath = safeDecodeURIComponent(fileUrl.pathname);
+      if (process.platform === 'win32' && localPath.startsWith('/')) {
+        localPath = localPath.slice(1);
+      }
+    } catch (error) {
+      return null;
+    }
+  }
+
+  const resolvedPath = path.resolve(safeDecodeURIComponent(localPath));
+  if (!fs.existsSync(resolvedPath) || !fs.statSync(resolvedPath).isFile()) {
+    return null;
+  }
+
+  const extension = path.extname(resolvedPath).toLowerCase();
+  const imageType = EXT_TO_IMAGE_TYPE[extension];
+  if (!imageType) return null;
+
+  const data = fs.readFileSync(resolvedPath);
+  return {
+    type: imageType,
+    data,
+    svgMeta: imageType === 'svg' ? parseSvgMeta(data.toString('utf-8')) : null
+  };
+}
+
+function computeImageTransformation(imgElement, imageData) {
+  const widthAttr = Number.parseInt(imgElement.getAttribute('width') || '', 10);
+  const heightAttr = Number.parseInt(imgElement.getAttribute('height') || '', 10);
+  const hasWidthAttr = Number.isFinite(widthAttr) && widthAttr > 0;
+  const hasHeightAttr = Number.isFinite(heightAttr) && heightAttr > 0;
+  const ratio = getAspectRatio(imageData);
+
+  let width = hasWidthAttr ? widthAttr : MAX_IMAGE_WIDTH_PX;
+  let scaleByWidth = 1;
+  if (width > MAX_IMAGE_WIDTH_PX) {
+    scaleByWidth = MAX_IMAGE_WIDTH_PX / width;
+    width = MAX_IMAGE_WIDTH_PX;
+  }
+
+  let height;
+  if (hasHeightAttr) {
+    // 当宽度被页面上限收缩时，同步按比例缩放高度，避免图像拉伸
+    height = Math.round(heightAttr * scaleByWidth);
+  } else {
+    height = Math.round(width / ratio);
+  }
+
+  if (!Number.isFinite(height) || height <= 0) {
+    height = DEFAULT_IMAGE_HEIGHT_PX;
+  }
+
+  return { width, height };
+}
+
+function getAspectRatio(imageData) {
+  if (imageData.type === 'svg' && imageData.svgMeta) {
+    const { width, height } = imageData.svgMeta;
+    if (width > 0 && height > 0) {
+      return width / height;
+    }
+  }
+  return 16 / 9;
+}
+
+function parseSvgMeta(svgText) {
+  const viewBoxMatch = svgText.match(/viewBox="([^"]+)"/i);
+  if (viewBoxMatch) {
+    const values = viewBoxMatch[1]
+      .trim()
+      .split(/[\s,]+/)
+      .map(value => Number.parseFloat(value));
+    if (values.length === 4 && values[2] > 0 && values[3] > 0) {
+      return { width: values[2], height: values[3] };
+    }
+  }
+
+  const widthMatch = svgText.match(/\bwidth="([\d.]+)(px)?"/i);
+  const heightMatch = svgText.match(/\bheight="([\d.]+)(px)?"/i);
+  const width = widthMatch ? Number.parseFloat(widthMatch[1]) : NaN;
+  const height = heightMatch ? Number.parseFloat(heightMatch[1]) : NaN;
+  if (Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0) {
+    return { width, height };
+  }
+
+  return null;
+}
+
+function safeDecodeURIComponent(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch (error) {
+    return value;
+  }
 }
 
 /**
@@ -454,6 +657,19 @@ function convertInlineNodes(nodes, skipNestedLists = false) {
         case 'BR':
           runs.push(new TextRun({ text: '', break: 1 }));
           break;
+
+        case 'IMG': {
+          const imageRun = createImageRun(node);
+          if (imageRun) {
+            runs.push(imageRun);
+          } else {
+            const alt = node.getAttribute('alt') || '图片';
+            const src = node.getAttribute('src') || '';
+            const fallbackText = src ? `[图片: ${alt}] (${src})` : `[图片: ${alt}]`;
+            runs.push(new TextRun({ text: fallbackText, italics: true, color: "6B7280" }));
+          }
+          break;
+        }
 
         default:
           runs.push(...convertInlineNodes(node.childNodes, skipNestedLists));
