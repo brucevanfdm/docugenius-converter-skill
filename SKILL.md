@@ -4,14 +4,14 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 ---
 # DocuGenius Document Converter
 
-缓存。双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、PowerPoint (.pptx) 和 PDF (.pdf) 转换为 AI 友好的 Markdown 格式，或将 Markdown (.md) 转换为 Word (.docx) 格式。
+双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、PowerPoint (.pptx) 和 PDF (.pdf) 转换为 AI 友好的 Markdown 格式，或将 Markdown (.md) 转换为 Word (.docx) 格式。
 
 ## Quick Reference
 
 **Linux/macOS:**
 
-| 操作                   | 命令                           | 输出位置             |
-| ---------------------- | ------------------------------ | -------------------- |
+| 操作                   | 命令                              | 输出位置             |
+| ---------------------- | --------------------------------- | -------------------- |
 | Office/PDF → Markdown | `bash convert.sh <file>`        | 同目录 `Markdown/` |
 | Markdown → Word       | `bash convert.sh <file.md>`     | 同目录 `Word/`     |
 | 批量转换               | `bash convert.sh --batch <dir>` | 同上                 |
@@ -36,12 +36,12 @@ description: 双向文档转换工具，将 Word (.docx)、Excel (.xlsx)、Power
 
 **重要**：根据运行环境选择正确的执行方式：
 
-| 环境                         | 推荐命令                                                                 | 说明                          |
-| ---------------------------- | ------------------------------------------------------------------------ | ----------------------------- |
-| **Linux/macOS**        | `bash convert.sh <file>`                                                  | 使用 bash 执行（无需执行权限） |
-| **Windows PowerShell** | `powershell.exe -Command "cd '<skill-dir>' && .\convert.ps1 '<file>'"` | 推荐方式，支持 UTF-8 编码     |
-| **Windows Git Bash**   | `powershell.exe -Command "cd '<skill-dir>' && .\convert.ps1 '<file>'"` | 在 Git Bash 中调用 PowerShell |
-| **Windows CMD**        | `convert.bat <file>`                                                   | 传统方式，可能有编码问题      |
+| 环境                         | 推荐命令                                                                 | 说明                           |
+| ---------------------------- | ------------------------------------------------------------------------ | ------------------------------ |
+| **Linux/macOS**        | `bash convert.sh <file>`                                               | 使用 bash 执行（无需执行权限） |
+| **Windows PowerShell** | `powershell.exe -Command "cd '<skill-dir>' && .\convert.ps1 '<file>'"` | 推荐方式，支持 UTF-8 编码      |
+| **Windows Git Bash**   | `powershell.exe -Command "cd '<skill-dir>' && .\convert.ps1 '<file>'"` | 在 Git Bash 中调用 PowerShell  |
+| **Windows CMD**        | `convert.bat <file>`                                                   | 传统方式，可能有编码问题       |
 
 **Claude Code 中的最佳实践**：
 

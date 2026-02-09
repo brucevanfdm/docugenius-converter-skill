@@ -10,6 +10,7 @@
 
 - **Office/PDF → Markdown**：将 Word、Excel、PowerPoint、PDF 等文档转换为 AI 友好的 Markdown 格式进行分析
 - **Markdown → Word**：将 Markdown 导出为**排版精美的 Word 文档**，自动应用专业样式和格式
+- **Mermaid 图片导出**：在 Markdown → Word 时，自动将 Mermaid 代码块渲染为图片并嵌入 Word
 
 ## 为什么需要这个 Skill？
 
@@ -25,10 +26,10 @@ Claude Code 默认只能直接读取 Markdown 和纯文本文件。当你上传 
 
 ### 文档转换能力
 
-| 转换方向                         | 支持格式                  | 特性                     |
-| -------------------------------- | ------------------------- | ------------------------ |
-| **Office/PDF → Markdown** | .docx, .xlsx, .pptx, .pdf | 标题、列表、表格、格式   |
-| **Markdown → Word**       | .md                       | 专业文档、样式保留、Mermaid 图表嵌入 |
+| 转换方向                         | 支持格式                  | 特性                                     |
+| -------------------------------- | ------------------------- | ---------------------------------------- |
+| **Office/PDF → Markdown** | .docx, .xlsx, .pptx, .pdf | 标题、列表、表格、格式                   |
+| **Markdown → Word**       | .md                       | 专业文档、样式保留、Mermaid 代码块转图片 |
 
 ### 智能内容提取
 
@@ -36,7 +37,7 @@ Claude Code 默认只能直接读取 Markdown 和纯文本文件。当你上传 
 - **格式保留**：保留粗体、斜体等文本格式
 - **表格转换**：智能转换表格为 Markdown 格式
 - **列表支持**：支持有序列表、无序列表及多级嵌套
-- **Mermaid 图表**：支持基于 `mmdc (mermaid-cli)` 渲染 Mermaid 代码块，并以 Word 兼容性更好的图片格式嵌入
+- **Mermaid 图表**：支持基于 `mmdc (mermaid-cli)` 渲染 Mermaid 代码块，并以 Word 兼容性更好的 PNG 图片格式嵌入
 
 ### 轻量高效
 
@@ -72,6 +73,7 @@ git clone https://github.com/yourusername/docugenius-converter-skill.git %USERPR
 - Python 依赖会自动安装到用户目录（使用 `pip install --user`）
 - 不受 macOS PEP 668 系统保护限制
 - 无需虚拟环境
+- Mermaid 渲染依赖会在首次 Markdown → Word 导出时按需安装（Node.js 环境）
 
 **手动安装（可选）**：
 
@@ -92,12 +94,12 @@ npm install
 
 根据你的操作系统和环境，选择合适的执行方式：
 
-| 环境 | 推荐命令 | 说明 |
-|------|---------|------|
-| **Linux/macOS** | `./convert.sh <file>` | 直接执行 Shell 脚本 |
-| **Windows PowerShell** | `.\convert.ps1 <file>` | 推荐方式，支持 UTF-8 编码 |
-| **Windows Git Bash** | `powershell.exe -Command "Set-Location '<skill-dir>'; .\convert.ps1 '<file>'"` | 在 Git Bash 中调用 PowerShell |
-| **Windows CMD** | `convert.bat <file>` | 传统方式，可能有编码问题 |
+| 环境                         | 推荐命令                                                                         | 说明                          |
+| ---------------------------- | -------------------------------------------------------------------------------- | ----------------------------- |
+| **Linux/macOS**        | `./convert.sh <file>`                                                          | 直接执行 Shell 脚本           |
+| **Windows PowerShell** | `.\convert.ps1 <file>`                                                         | 推荐方式，支持 UTF-8 编码     |
+| **Windows Git Bash**   | `powershell.exe -Command "Set-Location '<skill-dir>'; .\convert.ps1 '<file>'"` | 在 Git Bash 中调用 PowerShell |
+| **Windows CMD**        | `convert.bat <file>`                                                           | 传统方式，可能有编码问题      |
 
 **在 Claude Code 中使用**：
 
@@ -130,6 +132,21 @@ powershell.exe -Command "Set-Location 'C:\Users\Bruce\VSCodeProject\docugenius-c
 ```
 把 notes.md 导出为 Word 文档
 ```
+
+### Mermaid 图片导出示例（新）
+
+在 Markdown 中写 Mermaid 代码块，导出 Word 时会自动渲染为图片：
+
+```markdown
+```mermaid
+flowchart TD
+    A[开始] --> B{是否通过}
+    B -->|是| C[继续]
+    B -->|否| D[结束]
+```
+```
+
+导出后的 `.docx` 中会插入对应图表图片；如果 Mermaid 渲染失败，会自动回退为原始代码块，避免转换中断。
 
 ### 批量处理
 
@@ -199,6 +216,15 @@ pip install --user python-docx openpyxl python-pptx pdfplumber
 cd scripts/md_to_docx
 npm install
 ```
+
+### Mermaid 没有导出成图片？
+
+请优先检查以下两点：
+
+1. Node.js 与 npm 可用（`node -v`、`npm -v`）
+2. Mermaid 依赖已安装（`cd scripts/md_to_docx && npm install`）
+
+如果仍失败，转换不会中断，文档会回退保留 Mermaid 原始代码块。
 
 ## 最佳实践
 
