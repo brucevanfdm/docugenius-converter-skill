@@ -51,3 +51,5 @@ test.docx
 # Claude 缓存和虚拟环境（本地开发时）
 .claude/cache/
 # 注意：.claude/venvs/ 是全局共享的，不在此忽略
+
+/test

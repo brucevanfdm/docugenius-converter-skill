@@ -133,6 +133,29 @@ function resolveMMDCCommand() {
   candidates.push(path.join(__dirname, 'node_modules', '.bin', `mmdc${ext}`));
   candidates.push(path.join(process.cwd(), 'node_modules', '.bin', `mmdc${ext}`));
 
+  const sharedRoot = resolveSharedNodeRoot();
+  if (sharedRoot) {
+    candidates.push(path.join(sharedRoot, 'md_to_docx', 'node_modules', '.bin', `mmdc${ext}`));
+  }
+
+  const nodePath = process.env.NODE_PATH || '';
+  if (nodePath) {
+    for (const entry of nodePath.split(path.delimiter)) {
+      const normalized = (entry || '').trim();
+      if (!normalized) continue;
+      candidates.push(path.join(normalized, '.bin', `mmdc${ext}`));
+    }
+  }
+
+  try {
+    const mermaidPkg = require.resolve('@mermaid-js/mermaid-cli/package.json');
+    const pkgDir = path.dirname(mermaidPkg);
+    const nodeModulesDir = path.resolve(pkgDir, '..', '..', '..');
+    candidates.push(path.join(nodeModulesDir, '.bin', `mmdc${ext}`));
+  } catch (error) {
+    // noop: 依赖可能尚未安装
+  }
+
   for (const command of candidates) {
     if (command && fs.existsSync(command)) {
       return command;
@@ -140,6 +163,19 @@ function resolveMMDCCommand() {
   }
 
   return 'mmdc';
+}
+
+function resolveSharedNodeRoot() {
+  if (process.env.DOCUGENIUS_NODE_HOME) {
+    return process.env.DOCUGENIUS_NODE_HOME;
+  }
+
+  if (process.platform === 'win32') {
+    const base = process.env.LOCALAPPDATA || process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Local');
+    return path.join(base, 'DocuGenius', 'node');
+  }
+
+  return path.join(os.homedir(), '.docugenius', 'node');
 }
 
 function buildPuppeteerConfig() {
@@ -151,7 +187,15 @@ function buildPuppeteerConfig() {
 
 function runCommand(command, args, cwd, timeoutMs) {
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
+    let finalCommand = command;
+    let finalArgs = args;
+
+    if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(command)) {
+      finalCommand = process.env.ComSpec || 'cmd.exe';
+      finalArgs = ['/d', '/s', '/c', command, ...args];
+    }
+
+    const child = spawn(finalCommand, finalArgs, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,

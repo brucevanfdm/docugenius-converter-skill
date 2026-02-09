@@ -166,6 +166,16 @@ def _ensure_shared_node_modules(shared_dir, source_dir):
 
     return True, None
 
+def _find_mmdc_binary(node_modules_dir):
+    if not node_modules_dir:
+        return None
+
+    ext = ".cmd" if sys.platform == "win32" else ""
+    candidate = os.path.join(node_modules_dir, ".bin", f"mmdc{ext}")
+    if os.path.exists(candidate):
+        return candidate
+    return None
+
 # ==================== 依赖安装函数 ====================
 
 def install_dependencies(pip_packages):
@@ -659,21 +669,27 @@ def convert_md(file_path, output_dir=None):
     shared_dir = os.path.join(shared_root, 'md_to_docx')
     shared_node_modules = os.path.join(shared_dir, 'node_modules')
 
+    local_mmdc = _find_mmdc_binary(local_node_modules)
+    shared_mmdc = _find_mmdc_binary(shared_node_modules)
+
     use_shared = False
-    if not os.path.exists(local_node_modules):
-        if not os.path.exists(shared_node_modules):
-            ok, err = _ensure_shared_node_modules(shared_dir, source_dir)
-            if not ok:
-                return {
-                    'success': False,
-                    'error': (
-                        f"{err}\n"
-                        f"可手动安装：\n"
-                        f"  1) 本地安装：cd {source_dir} && npm install\n"
-                        f"  2) 共享安装：cd {shared_dir} && npm install\n"
-                        f"可通过环境变量 {NODE_SHARED_HOME_ENV} 指定共享目录。"
-                    )
-                }
+    need_shared = (not os.path.exists(local_node_modules)) or (local_mmdc is None)
+    if need_shared and shared_mmdc is None:
+        ok, err = _ensure_shared_node_modules(shared_dir, source_dir)
+        if not ok:
+            return {
+                'success': False,
+                'error': (
+                    f"{err}\n"
+                    f"可手动安装：\n"
+                    f"  1) 本地安装：cd {source_dir} && npm install\n"
+                    f"  2) 共享安装：cd {shared_dir} && npm install\n"
+                    f"可通过环境变量 {NODE_SHARED_HOME_ENV} 指定共享目录。"
+                )
+            }
+        shared_mmdc = _find_mmdc_binary(shared_node_modules)
+
+    if need_shared and shared_mmdc:
         use_shared = True
 
     try:
@@ -689,6 +705,10 @@ def convert_md(file_path, output_dir=None):
                 env["NODE_PATH"] = os.pathsep.join([shared_node_modules, existing])
             else:
                 env["NODE_PATH"] = shared_node_modules
+
+        mmdc_binary = local_mmdc or shared_mmdc
+        if mmdc_binary:
+            env["DOCUGENIUS_MMDC_PATH"] = mmdc_binary
 
         result = subprocess.run(
             cmd,
