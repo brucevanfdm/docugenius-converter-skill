@@ -137,14 +137,14 @@ powershell.exe -Command "Set-Location 'C:\Users\Bruce\VSCodeProject\docugenius-c
 
 在 Markdown 中写 Mermaid 代码块，导出 Word 时会自动渲染为图片：
 
-```markdown
+````markdown
 ```mermaid
 flowchart TD
     A[开始] --> B{是否通过}
     B -->|是| C[继续]
     B -->|否| D[结束]
 ```
-```
+````
 
 导出后的 `.docx` 中会插入对应图表图片；如果 Mermaid 渲染失败，会自动回退为原始代码块，避免转换中断。
 
