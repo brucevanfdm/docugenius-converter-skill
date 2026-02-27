@@ -18,6 +18,9 @@ const NODE_TYPE = {
 
 const MAX_LIST_LEVEL = 4;
 const MAX_IMAGE_WIDTH_PX = 560;
+
+// Markdown 文件所在目录，用于解析相对路径图片
+let _basePath = null;
 const DEFAULT_IMAGE_HEIGHT_PX = 280;
 const SVG_FALLBACK_PIXEL = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6N6t0AAAAASUVORK5CYII=',
@@ -47,7 +50,8 @@ const EXT_TO_IMAGE_TYPE = {
  * @param {string} htmlString - HTML 字符串
  * @returns {Array} docx 组件数组
  */
-function convertHTMLToDocx(htmlString) {
+function convertHTMLToDocx(htmlString, basePath) {
+  _basePath = (basePath && typeof basePath === 'string') ? basePath : null;
   const dom = new JSDOM(`<body>${htmlString}</body>`);
   const temp = dom.window.document.body;
 
@@ -297,16 +301,28 @@ function parseLocalImage(src) {
   if (src.startsWith('file://')) {
     try {
       const fileUrl = new URL(src);
-      localPath = safeDecodeURIComponent(fileUrl.pathname);
-      if (process.platform === 'win32' && localPath.startsWith('/')) {
-        localPath = localPath.slice(1);
+      // 处理 file://C:/path 格式（两个斜杠，Windows 盘符被误识别为 hostname）
+      if (process.platform === 'win32' && /^[a-zA-Z]$/.test(fileUrl.hostname)) {
+        localPath = safeDecodeURIComponent(fileUrl.hostname + ':' + fileUrl.pathname);
+      } else {
+        localPath = safeDecodeURIComponent(fileUrl.pathname);
+        if (process.platform === 'win32' && localPath.startsWith('/')) {
+          localPath = localPath.slice(1);
+        }
       }
     } catch (error) {
       return null;
     }
   }
 
-  const resolvedPath = path.resolve(safeDecodeURIComponent(localPath));
+  let decodedPath = safeDecodeURIComponent(localPath);
+  // 处理 /C:/path 格式（前导斜杠 + Windows 盘符）
+  if (process.platform === 'win32' && /^\/[a-zA-Z]:[\\/]/.test(decodedPath)) {
+    decodedPath = decodedPath.slice(1);
+  }
+  const resolvedPath = (_basePath && !path.isAbsolute(decodedPath))
+    ? path.resolve(_basePath, decodedPath)
+    : path.resolve(decodedPath);
   if (!fs.existsSync(resolvedPath) || !fs.statSync(resolvedPath).isFile()) {
     return null;
   }

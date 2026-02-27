@@ -31,8 +31,9 @@ async function convertMarkdownToDocx(inputPath, outputDir) {
     // Markdown -> HTML
     const html = await markdownToHTML(markdown);
 
-    // HTML -> DOCX 组件
-    const docxChildren = convertHTMLToDocx(html);
+    // HTML -> DOCX 组件（传入 Markdown 文件所在目录，用于解析相对路径图片）
+    const mdDir = path.dirname(path.resolve(inputPath));
+    const docxChildren = convertHTMLToDocx(html, mdDir);
 
     // 创建文档
     const doc = new Document({
