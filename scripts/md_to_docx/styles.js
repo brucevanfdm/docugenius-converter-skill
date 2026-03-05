@@ -307,11 +307,11 @@ function createNumbering() {
           {
             level: 0,
             format: LevelFormat.DECIMAL,
-            text: "%1、",  // 中文习惿使用顿号
+            text: "%1、",  // 中文习惯使用顿号
             alignment: AlignmentType.LEFT,
             style: {
               paragraph: {
-                indent: { left: 720, hanging: 360 }
+                indent: { left: 720, hanging: 480 }
               }
             }
           },
@@ -322,7 +322,7 @@ function createNumbering() {
             alignment: AlignmentType.LEFT,
             style: {
               paragraph: {
-                indent: { left: 1440, hanging: 360 }
+                indent: { left: 1440, hanging: 720 }
               }
             }
           },
@@ -333,7 +333,7 @@ function createNumbering() {
             alignment: AlignmentType.LEFT,
             style: {
               paragraph: {
-                indent: { left: 2160, hanging: 360 }
+                indent: { left: 2160, hanging: 420 }
               }
             }
           },
@@ -344,7 +344,7 @@ function createNumbering() {
             alignment: AlignmentType.LEFT,
             style: {
               paragraph: {
-                indent: { left: 2880, hanging: 360 }
+                indent: { left: 2880, hanging: 420 }
               }
             }
           },
@@ -355,7 +355,7 @@ function createNumbering() {
             alignment: AlignmentType.LEFT,
             style: {
               paragraph: {
-                indent: { left: 3600, hanging: 360 }
+                indent: { left: 3600, hanging: 420 }
               }
             }
           }

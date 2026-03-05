@@ -144,6 +144,10 @@ function processLists(html) {
     return count;
   };
 
+  // 将原始空格数规范化为离散层级（每2个空格算一级），
+  // 避免2空格/3空格/4空格混用导致层级判断错误
+  const normalizeIndent = (spaces) => Math.floor(spaces / 2);
+
   const closeToIndent = (targetIndent) => {
     while (stack.length > 0 && targetIndent < stack[stack.length - 1].indent) {
       const top = stack[stack.length - 1];
@@ -196,7 +200,7 @@ function processLists(html) {
           continue;
         }
 
-        const lineIndent = countLeadingSpaces(line);
+        const lineIndent = normalizeIndent(countLeadingSpaces(line));
 
         // 如果是从更深层级缩进回退，先关闭嵌套列表
         while (stack.length > 1 && lineIndent <= stack[stack.length - 1].indent) {
@@ -225,7 +229,7 @@ function processLists(html) {
     }
 
     const indentStr = (ulMatch || olMatch)[1] || '';
-    const indent = countLeadingSpaces(indentStr);
+    const indent = normalizeIndent(countLeadingSpaces(indentStr));
     const type = ulMatch ? 'ul' : 'ol';
     const itemText = (ulMatch || olMatch)[2];
 

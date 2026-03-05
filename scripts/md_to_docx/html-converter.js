@@ -86,6 +86,61 @@ const EXT_TO_IMAGE_TYPE = {
 };
 
 /**
+ * 从位图 Buffer 中解析实际像素尺寸
+ * 支持 PNG、JPEG、GIF、BMP
+ * @param {Buffer} buffer - 图片数据
+ * @param {string} type - 图片类型
+ * @returns {{width: number, height: number}|null}
+ */
+function parseBitmapSize(buffer, type) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 10) return null;
+
+  if (type === 'png') {
+    // PNG: IHDR chunk at offset 16-23
+    if (buffer.length >= 24 && buffer.toString('hex', 0, 8) === '89504e470d0a1a0a') {
+      return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+    }
+    return null;
+  }
+
+  if (type === 'jpg') {
+    // JPEG: 查找 SOF0/SOF2 marker (0xFFC0 或 0xFFC2)
+    let offset = 2; // 跳过 SOI marker
+    while (offset + 9 < buffer.length) {
+      if (buffer[offset] !== 0xFF) break;
+      const marker = buffer[offset + 1];
+      if (marker === 0xC0 || marker === 0xC2) {
+        const height = buffer.readUInt16BE(offset + 5);
+        const width = buffer.readUInt16BE(offset + 7);
+        return { width, height };
+      }
+      // 跳过当前 segment
+      const segLen = buffer.readUInt16BE(offset + 2);
+      offset += 2 + segLen;
+    }
+    return null;
+  }
+
+  if (type === 'gif') {
+    // GIF: 宽高在 bytes 6-9（little-endian）
+    if (buffer.length >= 10 && (buffer.toString('ascii', 0, 3) === 'GIF')) {
+      return { width: buffer.readUInt16LE(6), height: buffer.readUInt16LE(8) };
+    }
+    return null;
+  }
+
+  if (type === 'bmp') {
+    // BMP: DIB header 中 width 在 offset 18, height 在 offset 22（signed LE 32-bit）
+    if (buffer.length >= 26 && buffer.readUInt16LE(0) === 0x4D42) {
+      return { width: Math.abs(buffer.readInt32LE(18)), height: Math.abs(buffer.readInt32LE(22)) };
+    }
+    return null;
+  }
+
+  return null;
+}
+
+/**
  * 将 HTML 字符串转换为 docx 组件数组
  * @param {string} htmlString - HTML 字符串
  * @returns {Array} docx 组件数组
@@ -248,6 +303,7 @@ function convertImage(imgElement) {
     return new Paragraph({
       children: [imageRun],
       alignment: AlignmentType.CENTER,
+      indent: { firstLine: 0 },
       spacing: { before: 200, after: 200 }
     });
   }
@@ -262,6 +318,7 @@ function convertImage(imgElement) {
 
   return new Paragraph({
     children: [new TextRun({ text: description, italics: true, color: "6B7280" })],
+    indent: { firstLine: 0 },
     spacing: { before: 200, after: 200 }
   });
 }
@@ -325,7 +382,8 @@ function parseDataImage(src) {
   return {
     type: imageType,
     data: buffer,
-    svgMeta: imageType === 'svg' ? parseSvgMeta(buffer.toString('utf-8')) : null
+    svgMeta: imageType === 'svg' ? parseSvgMeta(buffer.toString('utf-8')) : null,
+    bitmapSize: imageType !== 'svg' ? parseBitmapSize(buffer, imageType) : null
   };
 }
 
@@ -372,7 +430,8 @@ function parseLocalImage(src) {
   return {
     type: imageType,
     data,
-    svgMeta: imageType === 'svg' ? parseSvgMeta(data.toString('utf-8')) : null
+    svgMeta: imageType === 'svg' ? parseSvgMeta(data.toString('utf-8')) : null,
+    bitmapSize: imageType !== 'svg' ? parseBitmapSize(data, imageType) : null
   };
 }
 
@@ -408,6 +467,12 @@ function computeImageTransformation(imgElement, imageData) {
 function getAspectRatio(imageData) {
   if (imageData.type === 'svg' && imageData.svgMeta) {
     const { width, height } = imageData.svgMeta;
+    if (width > 0 && height > 0) {
+      return width / height;
+    }
+  }
+  if (imageData.bitmapSize) {
+    const { width, height } = imageData.bitmapSize;
     if (width > 0 && height > 0) {
       return width / height;
     }
@@ -472,9 +537,10 @@ function convertList(listElement, level = 0) {
 
       if (numbered) {
         options.numbering = { reference: reference, level: safeLevel };
+        options.indent = { firstLine: 0 };
       } else {
-        // 列表项续行：缩进以对齐列表文本
-        options.indent = { left: 720 + safeLevel * 720 };
+        // 列表项续行：缩进以对齐列表文本，取消首行缩进
+        options.indent = { left: 720 * (safeLevel + 1), firstLine: 0 };
       }
 
       paragraphs.push(new Paragraph(options));
