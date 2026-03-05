@@ -53,9 +53,8 @@ async function markdownToHTML(markdown) {
   // 处理删除线
   html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
 
-  // 处理引用块
-  html = html.replace(/^>\s+(.+)$/gm, '<blockquote>$1</blockquote>');
-  html = html.replace(/<\/blockquote>\n<blockquote>/g, '\n');
+  // 处理引用块（将连续的 > 行合并为一个 blockquote，每行内容包裹在 <p> 中）
+  html = processBlockquotes(html);
 
   // 处理列表
   html = processLists(html);
@@ -376,6 +375,42 @@ function processParagraphs(html) {
     result.push(`<p>${paragraph.join(' ')}</p>`);
   }
 
+  return result.join('\n');
+}
+
+/**
+ * 处理引用块：将连续的 > 行合并为一个 <blockquote>，每行内容包裹在 <p> 中
+ */
+function processBlockquotes(html) {
+  const lines = html.split('\n');
+  const result = [];
+  let blockquoteLines = [];
+
+  const flushBlockquote = () => {
+    if (blockquoteLines.length > 0) {
+      const content = blockquoteLines
+        .map(line => {
+          const trimmed = line.trim();
+          return trimmed ? `<p>${trimmed}</p>` : '';
+        })
+        .filter(Boolean)
+        .join('');
+      result.push(`<blockquote>${content}</blockquote>`);
+      blockquoteLines = [];
+    }
+  };
+
+  for (const line of lines) {
+    const match = line.match(/^>\s?(.*)/);
+    if (match) {
+      blockquoteLines.push(match[1]);
+    } else {
+      flushBlockquote();
+      result.push(line);
+    }
+  }
+
+  flushBlockquote();
   return result.join('\n');
 }
 

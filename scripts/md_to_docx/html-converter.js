@@ -178,10 +178,7 @@ function convertNode(node) {
         return convertImage(node);
 
       case 'HR':
-        return new Paragraph({
-          children: [new TextRun({ text: '─'.repeat(50), color: 'CCCCCC' })],
-          alignment: AlignmentType.CENTER
-        });
+        return null;
 
       case 'BR':
         return new Paragraph({ text: '' });
@@ -598,21 +595,42 @@ function convertCellContent(cellElement, isHeader = false) {
 
 /**
  * 转换引用块
+ * 处理混合的内联元素（STRONG、EM 等）和文本节点，按换行拆分为多个段落
  */
 function convertBlockquote(blockquoteElement) {
   const paragraphs = [];
+  let currentRuns = [];
+
+  const flushRuns = () => {
+    if (currentRuns.length > 0) {
+      paragraphs.push(new Paragraph({ children: currentRuns, style: "Quote" }));
+      currentRuns = [];
+    }
+  };
 
   for (const child of blockquoteElement.childNodes) {
     if (child.nodeName === 'P') {
+      flushRuns();
       const runs = convertInlineNodes(child.childNodes);
       paragraphs.push(new Paragraph({ children: runs, style: "Quote" }));
     } else if (child.nodeType === NODE_TYPE.TEXT_NODE) {
-      const text = child.textContent.trim();
-      if (text) {
-        paragraphs.push(new Paragraph({ children: [new TextRun(text)], style: "Quote" }));
+      const text = child.textContent;
+      const parts = text.split('\n');
+      for (let i = 0; i < parts.length; i++) {
+        if (i > 0) {
+          flushRuns();
+        }
+        const part = parts[i].trim();
+        if (part) {
+          currentRuns.push(...createTextRunsWithEmoji(part));
+        }
       }
+    } else if (child.nodeType === NODE_TYPE.ELEMENT_NODE) {
+      currentRuns.push(...convertInlineNodes([child]));
     }
   }
+
+  flushRuns();
 
   return paragraphs.length > 0 ? paragraphs : [new Paragraph({
     text: blockquoteElement.textContent,
