@@ -458,7 +458,7 @@ def convert_docx(file_path):
 
         if heading_level is not None:
             heading_prefix = "#" * min(heading_level, 6)  # Markdown最多支持6级标题
-            return f"{heading_prefix} {para.text.strip()}\n\n"
+            return f"{heading_prefix} {text_value}\n\n"
 
         # 检查是否是列表项
         # 优先使用 numPr + numbering.xml 解析列表编号格式与层级
@@ -568,19 +568,94 @@ def convert_xlsx(file_path):
     return content.strip()
 
 def convert_pptx(file_path):
-    """转换 PowerPoint 文件"""
+    """转换 PowerPoint 文件，提取标题、列表、格式、表格和备注"""
     import pptx
+    from pptx.util import Pt
 
     presentation = pptx.Presentation(file_path)
     content = ""
+
+    def _format_run(run):
+        """格式化单个文本片段"""
+        text = run.text
+        if not text:
+            return ""
+        if run.font.bold and run.font.italic:
+            text = f"***{text}***"
+        elif run.font.bold:
+            text = f"**{text}**"
+        elif run.font.italic:
+            text = f"*{text}*"
+        return text
+
+    def _process_text_frame(text_frame, is_title=False):
+        """处理文本框，保留段落层级和格式"""
+        result = ""
+        for para in text_frame.paragraphs:
+            if not para.text.strip():
+                continue
+
+            # 拼接带格式的文本
+            formatted = ""
+            for run in para.runs:
+                formatted += _format_run(run)
+            text_value = formatted.strip() or para.text.strip()
+
+            if is_title:
+                result += f"### {text_value}\n\n"
+                continue
+
+            # 检查列表层级
+            level = para.level if para.level else 0
+            if level > 0:
+                indent = "  " * level
+                result += f"{indent}- {text_value}\n"
+            elif hasattr(para, '_pPr') and para._pPr is not None and para._pPr.find(
+                './/{http://schemas.openxmlformats.org/drawingml/2006/main}buChar') is not None:
+                result += f"- {text_value}\n"
+            elif hasattr(para, '_pPr') and para._pPr is not None and para._pPr.find(
+                './/{http://schemas.openxmlformats.org/drawingml/2006/main}buAutoNum') is not None:
+                result += f"1. {text_value}\n"
+            else:
+                result += text_value + "\n\n"
+
+        return result
 
     for i, slide in enumerate(presentation.slides, 1):
         if len(presentation.slides) > 1:
             content += f"## Slide {i}\n\n"
 
+        # 按占位符类型分类处理
         for shape in slide.shapes:
-            if hasattr(shape, "text") and shape.text.strip():
-                content += shape.text.strip() + "\n\n"
+            # 处理表格
+            if shape.has_table:
+                table = shape.table
+                for row_idx, row in enumerate(table.rows):
+                    row_data = [_normalize_table_cell(cell.text) for cell in row.cells]
+                    if row_idx == 0:
+                        content += "| " + " | ".join(row_data) + " |\n"
+                        content += "| " + " | ".join(["---"] * len(row_data)) + " |\n"
+                    else:
+                        content += "| " + " | ".join(row_data) + " |\n"
+                content += "\n"
+                continue
+
+            # 处理文本框
+            if shape.has_text_frame and shape.text.strip():
+                # 判断是否是标题占位符
+                is_title = False
+                if hasattr(shape, "placeholder_format") and shape.placeholder_format is not None:
+                    ph_idx = shape.placeholder_format.idx
+                    # 0 = title, 1 = center title, 对应 PP_PLACEHOLDER 类型
+                    is_title = ph_idx in (0, 1)
+
+                content += _process_text_frame(shape.text_frame, is_title=is_title)
+
+        # 提取备注
+        if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
+            notes_text = slide.notes_slide.notes_text_frame.text.strip()
+            if notes_text:
+                content += f"\n> **备注**: {notes_text}\n\n"
 
         if i < len(presentation.slides):
             content += "---\n\n"
@@ -594,34 +669,48 @@ def convert_pdf(file_path):
     content = ""
     with pdfplumber.open(file_path) as pdf:
         for page in pdf.pages:
-            # 提取表格
-            tables = page.extract_tables()
+            # 提取表格及其边界框
+            tables = page.find_tables()
+            table_bboxes = [t.bbox for t in tables] if tables else []
+
             if tables:
-                for table in tables:
+                for table_obj in tables:
+                    table = table_obj.extract()
                     if table and len(table) > 0:
                         # 过滤空行和空单元格
                         filtered_table = []
                         for row in table:
                             if row and any(cell is not None and str(cell).strip() for cell in row):
-                                # 清理单元格内容
                                 cleaned_row = [_normalize_table_cell(cell) for cell in row]
                                 filtered_table.append(cleaned_row)
 
                         if filtered_table:
                             max_cols = max(len(r) for r in filtered_table)
                             normalized = [r + [""] * (max_cols - len(r)) for r in filtered_table]
-                            # 输出为Markdown表格
                             for idx, row in enumerate(normalized):
                                 content += "| " + " | ".join(row) + " |\n"
-                                if idx == 0:  # 在第一行后添加分隔符
+                                if idx == 0:
                                     content += "| " + " | ".join(["---"] * len(row)) + " |\n"
                             content += "\n"
 
-            # 提取文本（排除表格区域）
-            # 注意：pdfplumber的extract_text会包含表格文本，这里我们简单处理
-            text = page.extract_text()
+            # 提取文本，排除表格区域避免内容重复
+            if table_bboxes:
+                # 过滤掉落在表格边界框内的字符
+                filtered_page = page
+                for bbox in table_bboxes:
+                    filtered_page = filtered_page.filter(
+                        lambda obj, b=bbox: not (
+                            obj.get("top", 0) >= b[1] and
+                            obj.get("bottom", 0) <= b[3] and
+                            obj.get("x0", 0) >= b[0] and
+                            obj.get("x1", 0) <= b[2]
+                        )
+                    )
+                text = filtered_page.extract_text()
+            else:
+                text = page.extract_text()
+
             if text and text.strip():
-                # 如果页面有表格，文本可能包含表格内容，这里做基本清理
                 lines = text.split('\n')
                 cleaned_lines = []
                 for line in lines:
