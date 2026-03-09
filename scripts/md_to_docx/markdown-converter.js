@@ -34,6 +34,21 @@ async function markdownToHTML(markdown) {
     return placeholder;
   });
 
+  // 3. 保护图片和链接语法（避免路径中的下划线/星号被误处理为粗体斜体）
+  const images = [];
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, url) => {
+    const placeholder = `\x00IMAGE${images.length}\x00`;
+    images.push({ alt, url });
+    return placeholder;
+  });
+
+  const links = [];
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
+    const placeholder = `\x00LINK${links.length}\x00`;
+    links.push({ text, url });
+    return placeholder;
+  });
+
   // 处理标题
   html = html.replace(/^######\s+(.+)$/gm, '<h6>$1</h6>');
   html = html.replace(/^#####\s+(.+)$/gm, '<h5>$1</h5>');
@@ -65,11 +80,15 @@ async function markdownToHTML(markdown) {
   // 处理水平线
   html = html.replace(/^(-{3,}|_{3,}|\*{3,})$/gm, '<hr>');
 
-  // 处理图片 ![alt](url)
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+  // 恢复图片（alt 文本中的粗体斜体已在前面处理）
+  images.forEach((img, i) => {
+    html = html.replace(`\x00IMAGE${i}\x00`, () => `<img src="${img.url}" alt="${img.alt}">`);
+  });
 
-  // 处理链接 [text](url)
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  // 恢复链接
+  links.forEach((link, i) => {
+    html = html.replace(`\x00LINK${i}\x00`, () => `<a href="${link.url}">${link.text}</a>`);
+  });
 
   // 恢复行内代码
   inlineCodes.forEach((code, i) => {
