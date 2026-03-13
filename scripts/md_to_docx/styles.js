@@ -3,7 +3,7 @@
  * 定义标题、段落、代码块等样式
  */
 
-const { AlignmentType, BorderStyle } = require('docx');
+const { AlignmentType, BorderStyle, TabStopType } = require('docx');
 
 /**
  * 将字符数转换为 twips (用于缩进)
@@ -54,7 +54,8 @@ function createStyles() {
           alignment: AlignmentType.CENTER,
           spacing: {
             before: 480,  // 24pt before
-            after: 240    // 12pt after
+            after: 240,   // 12pt after
+            line: 240     // 单倍行距
           },
           indent: {
             firstLine: 0  // 标题不缩进
@@ -75,7 +76,8 @@ function createStyles() {
         paragraph: {
           spacing: {
             before: 360,  // 18pt
-            after: 180    // 9pt
+            after: 180,   // 9pt
+            line: 240     // 单倍行距
           },
           indent: {
             firstLine: 0  // 标题不缩进
@@ -96,7 +98,8 @@ function createStyles() {
         paragraph: {
           spacing: {
             before: 300,  // 15pt
-            after: 180    // 9pt
+            after: 150,   // 7.5pt
+            line: 240     // 单倍行距
           },
           indent: {
             firstLine: 0  // 标题不缩进
@@ -117,7 +120,8 @@ function createStyles() {
         paragraph: {
           spacing: {
             before: 240,  // 12pt
-            after: 120    // 6pt
+            after: 120,   // 6pt
+            line: 240     // 单倍行距
           },
           indent: {
             firstLine: 0  // 标题不缩进
@@ -133,12 +137,13 @@ function createStyles() {
           font: "SimHei",  // 黑体
           size: 26,  // 13pt
           bold: true,
-          color: "374151"
+          color: "000000"
         },
         paragraph: {
           spacing: {
             before: 200,  // 10pt
-            after: 100    // 5pt
+            after: 100,   // 5pt
+            line: 240     // 单倍行距
           },
           indent: {
             firstLine: 0  // 标题不缩进
@@ -159,7 +164,8 @@ function createStyles() {
         paragraph: {
           spacing: {
             before: 160,  // 8pt
-            after: 80     // 4pt
+            after: 80,    // 4pt
+            line: 240     // 单倍行距
           },
           indent: {
             firstLine: 0  // 标题不缩进
@@ -374,7 +380,8 @@ function createNumbering() {
             alignment: AlignmentType.LEFT,
             style: {
               paragraph: {
-                indent: { left: 720, hanging: 480 }
+                indent: { left: 720, hanging: 480 },
+                tabStops: [{ type: TabStopType.LEFT, position: 720 }]
               }
             }
           },
@@ -385,7 +392,8 @@ function createNumbering() {
             alignment: AlignmentType.LEFT,
             style: {
               paragraph: {
-                indent: { left: 1440, hanging: 720 }
+                indent: { left: 1440, hanging: 720 },
+                tabStops: [{ type: TabStopType.LEFT, position: 1440 }]
               }
             }
           },
@@ -396,7 +404,8 @@ function createNumbering() {
             alignment: AlignmentType.LEFT,
             style: {
               paragraph: {
-                indent: { left: 2160, hanging: 420 }
+                indent: { left: 2160, hanging: 420 },
+                tabStops: [{ type: TabStopType.LEFT, position: 2160 }]
               }
             }
           },
@@ -407,7 +416,8 @@ function createNumbering() {
             alignment: AlignmentType.LEFT,
             style: {
               paragraph: {
-                indent: { left: 2880, hanging: 420 }
+                indent: { left: 2880, hanging: 420 },
+                tabStops: [{ type: TabStopType.LEFT, position: 2880 }]
               }
             }
           },
@@ -418,7 +428,8 @@ function createNumbering() {
             alignment: AlignmentType.LEFT,
             style: {
               paragraph: {
-                indent: { left: 3600, hanging: 420 }
+                indent: { left: 3600, hanging: 420 },
+                tabStops: [{ type: TabStopType.LEFT, position: 3600 }]
               }
             }
           }
