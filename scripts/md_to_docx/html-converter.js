@@ -206,11 +206,21 @@ function convertNode(node) {
         });
 
       case 'H4':
+        return new Paragraph({
+          children: createTextRunsWithEmoji(node.textContent),
+          style: "Heading4"
+        });
+
       case 'H5':
+        return new Paragraph({
+          children: createTextRunsWithEmoji(node.textContent),
+          style: "Heading5"
+        });
+
       case 'H6':
         return new Paragraph({
           children: createTextRunsWithEmoji(node.textContent),
-          style: "Heading3"
+          style: "Heading6"
         });
 
       case 'P':

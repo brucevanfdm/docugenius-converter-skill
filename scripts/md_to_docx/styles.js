@@ -104,6 +104,69 @@ function createStyles() {
         }
       },
       {
+        id: "Heading4",
+        name: "Heading 4",
+        basedOn: "Normal",
+        next: "Normal",
+        run: {
+          font: "SimHei",  // 黑体
+          size: 28,  // 14pt
+          bold: true,
+          color: "000000"
+        },
+        paragraph: {
+          spacing: {
+            before: 240,  // 12pt
+            after: 120    // 6pt
+          },
+          indent: {
+            firstLine: 0  // 标题不缩进
+          }
+        }
+      },
+      {
+        id: "Heading5",
+        name: "Heading 5",
+        basedOn: "Normal",
+        next: "Normal",
+        run: {
+          font: "SimHei",  // 黑体
+          size: 26,  // 13pt
+          bold: true,
+          color: "374151"
+        },
+        paragraph: {
+          spacing: {
+            before: 200,  // 10pt
+            after: 100    // 5pt
+          },
+          indent: {
+            firstLine: 0  // 标题不缩进
+          }
+        }
+      },
+      {
+        id: "Heading6",
+        name: "Heading 6",
+        basedOn: "Normal",
+        next: "Normal",
+        run: {
+          font: "SimHei",  // 黑体
+          size: 24,  // 12pt
+          bold: true,
+          color: "6B7280"
+        },
+        paragraph: {
+          spacing: {
+            before: 160,  // 8pt
+            after: 80     // 4pt
+          },
+          indent: {
+            firstLine: 0  // 标题不缩进
+          }
+        }
+      },
+      {
         id: "CodeBlock",
         name: "Code Block",
         basedOn: "Normal",
