@@ -20,7 +20,7 @@ async function markdownToHTML(markdown) {
 
   // 1. 首先保护代码块
   const codeBlocks = [];
-  html = html.replace(/```([^\n`]*)[ \t]*\n([\s\S]*?)```/g, (match, lang, code) => {
+  html = html.replace(/^```([^\n`]*)[ \t]*\n([\s\S]*?)```[ \t]*$/gm, (match, lang, code) => {
     const placeholder = `\x00CODEBLOCK${codeBlocks.length}\x00`;
     codeBlocks.push({ lang: lang || '', code: normalizeCodeBlockContent(code) });
     return placeholder;
