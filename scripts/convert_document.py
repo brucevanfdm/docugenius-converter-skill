@@ -830,49 +830,239 @@ def _render_pdf_table(table_obj):
     result += "\n"
     return result
 
-def _extract_pdf_page_blocks(page, tables):
-    """提取单页 PDF 的文本和表格块，尽量保持上下顺序"""
-    table_bboxes = [t.bbox for t in tables] if tables else []
-    blocks = []  # (top_position, content_string)
+# ---------- PDF 词元级文本重建辅助函数 ----------
 
+def _group_words_into_lines(words, y_tolerance=3):
+    """将词元按 top 坐标分组成行列表，每行按 x0 排序"""
+    if not words:
+        return []
+    sorted_words = sorted(words, key=lambda w: (w['top'], w['x0']))
+    lines = []
+    cur_line = [sorted_words[0]]
+    cur_top = sorted_words[0]['top']
+    for word in sorted_words[1:]:
+        if abs(word['top'] - cur_top) <= y_tolerance:
+            cur_line.append(word)
+        else:
+            lines.append(sorted(cur_line, key=lambda w: w['x0']))
+            cur_line = [word]
+            cur_top = word['top']
+    lines.append(sorted(cur_line, key=lambda w: w['x0']))
+    return lines
+
+
+def _reconstruct_line_text(line_words):
+    """从同一行的词元重建文本，词间用空格分隔"""
+    if not line_words:
+        return ""
+    return ' '.join(w['text'] for w in line_words)
+
+
+def _get_body_font_size(chars):
+    """计算正文字体大小（出现频率最高的字体大小，0.5pt 精度）"""
+    from collections import Counter
+    sizes = [round(c.get('size', 0) * 2) / 2 for c in chars if c.get('size', 0) > 0]
+    if not sizes:
+        return 10.0
+    return float(Counter(sizes).most_common(1)[0][0])
+
+
+def _get_line_avg_font_size(line_words, page_chars):
+    """通过 page.chars 计算某行的平均字体大小"""
+    if not line_words or not page_chars:
+        return 0.0
+    line_top = min(w['top'] for w in line_words)
+    line_bottom = max(w['bottom'] for w in line_words)
+    margin = max((line_bottom - line_top) * 0.5, 1.0)
+    relevant = [
+        c for c in page_chars
+        if c.get('top', 0) >= line_top - margin and c.get('bottom', 0) <= line_bottom + margin
+    ]
+    sizes = [c.get('size', 0) for c in relevant if c.get('size', 0) > 0]
+    return sum(sizes) / len(sizes) if sizes else 0.0
+
+
+def _detect_column_split(page_width, words, min_side_words=15):
+    """
+    检测双栏布局。检查页面中央是否存在明显空白带，是则返回分割线 x 坐标，否则返回 None。
+    适用于学术论文的双栏 PDF。
+    """
+    if not words or len(words) < min_side_words * 2:
+        return None
+    mid = page_width / 2
+    band = page_width * 0.07  # 中央空白带宽度的一半
+
+    center = sum(1 for w in words if w['x0'] > mid - band and w['x1'] < mid + band)
+    sides = sum(1 for w in words if w['x1'] <= mid - band or w['x0'] >= mid + band)
+    total = center + sides
+    if total == 0:
+        return None
+    # 中央词占比 < 6% 且两侧词数充足，判定为双栏
+    if sides >= min_side_words * 2 and center / total < 0.06:
+        return mid
+    return None
+
+
+def _lines_to_markdown_blocks(lines, page_chars, body_size):
+    """
+    将行列表（每行为词元列表）转换为 (top, markdown_text) 块列表。
+    - 字体明显大于正文的行识别为标题，连续标题行合并为一个标题
+    - 连续普通文本行合并成段落，行间距过大时另起段落
+    """
+    blocks = []
+    para_lines = []
+    para_top = None
+    prev_bottom = None
+    prev_line_height = None
+    heading_lines = []   # 连续标题行暂存
+    heading_top = None
+
+    def _flush_para():
+        if not para_lines:
+            return
+        text = _normalize_text(' '.join(para_lines))
+        if text:
+            blocks.append((para_top, _escape_plain_markdown_text(text) + "\n\n"))
+
+    def _flush_heading():
+        if not heading_lines:
+            return
+        text = ' '.join(heading_lines)
+        blocks.append((heading_top, f"### {text}\n\n"))
+
+    for line_words in lines:
+        if not line_words:
+            continue
+        line_top = min(w['top'] for w in line_words)
+        line_bottom = max(w['bottom'] for w in line_words)
+        line_height = max(line_bottom - line_top, 1.0)
+        line_text = _reconstruct_line_text(line_words).strip()
+        if not line_text:
+            continue
+
+        # 字体大小检测：比正文大 15% 以上视为标题
+        line_size = _get_line_avg_font_size(line_words, page_chars)
+        is_heading = line_size > 0 and body_size > 0 and line_size >= body_size * 1.15
+
+        # 行间距检测：使用较小行高作为参考，避免大字号标题的阈值过大
+        if prev_bottom is not None:
+            gap = line_top - prev_bottom
+            ref_height = min(line_height, prev_line_height) if prev_line_height else line_height
+            large_gap = gap > ref_height * 0.8
+        else:
+            large_gap = False
+
+        if is_heading:
+            _flush_para()
+            para_lines = []
+            para_top = None
+            # 连续标题行合并：若与上一标题行无大间距则追加
+            if heading_lines and not large_gap:
+                heading_lines.append(line_text)
+            else:
+                _flush_heading()
+                heading_lines = [line_text]
+                heading_top = line_top
+        else:
+            _flush_heading()
+            heading_lines = []
+            heading_top = None
+            if large_gap:
+                _flush_para()
+                para_lines = []
+                para_top = None
+            if para_top is None:
+                para_top = line_top
+            para_lines.append(line_text)
+
+        prev_bottom = line_bottom
+        prev_line_height = line_height
+
+    _flush_heading()
+    _flush_para()
+    return blocks
+
+
+def _extract_pdf_page_blocks(page, tables):
+    """
+    提取单页 PDF 的文本和表格块。
+    改进：
+    - 使用 extract_words() 重建文本，修复 LaTeX PDF 词间空格丢失问题
+    - 基于字体大小识别标题行
+    - 检测双栏布局（学术论文常见），分栏提取后顺序拼接
+    """
+    table_bboxes = [t.bbox for t in tables] if tables else []
+    blocks = []
+
+    # 收集表格块
     for table_obj in tables:
         md = _render_pdf_table(table_obj)
         if md:
             blocks.append((table_obj.bbox[1], md))
 
-    if table_bboxes:
-        filtered_page = page
-        for bbox in table_bboxes:
-            filtered_page = filtered_page.filter(
-                lambda obj, b=bbox: not (
-                    obj.get("top", 0) >= b[1] and
-                    obj.get("bottom", 0) <= b[3] and
-                    obj.get("x0", 0) >= b[0] and
-                    obj.get("x1", 0) <= b[2]
-                )
+    # 过滤掉表格区域内的对象
+    filtered_page = page
+    for bbox in table_bboxes:
+        filtered_page = filtered_page.filter(
+            lambda obj, b=bbox: not (
+                obj.get("top", 0) >= b[1] and
+                obj.get("bottom", 0) <= b[3] and
+                obj.get("x0", 0) >= b[0] and
+                obj.get("x1", 0) <= b[2]
             )
+        )
 
-        text_chars = filtered_page.chars
-        if text_chars:
-            split_tops = sorted(set([0.0] + [b[1] for b in table_bboxes] + [b[3] for b in table_bboxes]))
-            for seg_idx, seg_top in enumerate(split_tops):
-                seg_bottom = split_tops[seg_idx + 1] if seg_idx + 1 < len(split_tops) else float('inf')
-                seg_page = filtered_page.filter(
-                    lambda obj, t=seg_top, b=seg_bottom: obj.get("top", 0) >= t and obj.get("top", 0) < b
-                )
-                seg_text = _normalize_text(seg_page.extract_text(), preserve_newlines=True)
-                if seg_text:
-                    blocks.append((seg_top, "\n".join(_escape_plain_markdown_text(line) for line in seg_text.splitlines()) + "\n\n"))
-        else:
-            text = _normalize_text(filtered_page.extract_text(), preserve_newlines=True)
-            if text:
-                blocks.append((0.0, "\n".join(_escape_plain_markdown_text(line) for line in text.splitlines()) + "\n\n"))
-    else:
-        text = _normalize_text(page.extract_text(), preserve_newlines=True)
+    # 使用词元提取（修复空格丢失）
+    # x_tolerance=2: 学术 PDF（LaTeX）词间距约 2.7pt，默认值 3 会把相邻词粘连
+    try:
+        words = filtered_page.extract_words(x_tolerance=2, y_tolerance=3, keep_blank_chars=False)
+    except TypeError:
+        # 旧版 pdfplumber 不支持 keep_blank_chars 参数
+        words = filtered_page.extract_words(x_tolerance=2, y_tolerance=3)
+
+    # 过滤旋转文字（如 arXiv 水印），保留 upright（正向）词元
+    words = [w for w in words if w.get('upright', 1)]
+
+    page_chars = filtered_page.chars
+
+    if not words:
+        # 回退到 extract_text()
+        text = _normalize_text(filtered_page.extract_text(), preserve_newlines=True)
         if text:
             blocks.append((0.0, "\n".join(_escape_plain_markdown_text(line) for line in text.splitlines()) + "\n\n"))
+        blocks.sort(key=lambda b: b[0])
+        return blocks
 
-    blocks.sort(key=lambda block: block[0])
+    body_size = _get_body_font_size(page_chars) if page_chars else 10.0
+
+    # 检测双栏布局
+    col_split = _detect_column_split(page.width, words)
+
+    if col_split is not None:
+        # 双栏：分别处理左右两栏，左栏 top 保持原值，右栏 top 偏移到左栏之后
+        left_words = [w for w in words if w['x1'] <= col_split + 5]
+        right_words = [w for w in words if w['x0'] >= col_split - 5]
+        left_chars = [c for c in page_chars if c.get('x1', 0) <= col_split + 5]
+        right_chars = [c for c in page_chars if c.get('x0', 0) >= col_split - 5]
+
+        left_lines = _group_words_into_lines(left_words)
+        right_lines = _group_words_into_lines(right_words)
+
+        left_blocks = _lines_to_markdown_blocks(left_lines, left_chars, body_size)
+        right_blocks = _lines_to_markdown_blocks(right_lines, right_chars, body_size)
+
+        left_max = max((top for top, _ in left_blocks), default=0.0)
+        offset = left_max + page.height
+        right_shifted = [(top + offset, content) for top, content in right_blocks]
+
+        blocks.extend(left_blocks)
+        blocks.extend(right_shifted)
+    else:
+        lines = _group_words_into_lines(words)
+        text_blocks = _lines_to_markdown_blocks(lines, page_chars, body_size)
+        blocks.extend(text_blocks)
+
+    blocks.sort(key=lambda b: b[0])
     return blocks
 
 def convert_pdf(file_path):
