@@ -416,6 +416,71 @@ def _format_inline_markdown(text, *, bold=False, italic=False):
         wrapped = f"*{core}*"
     return f"{leading}{wrapped}{trailing}"
 
+def _compose_inline_markdown(groups):
+    """将分组后的富文本片段转换为 Markdown，并避免误转义已生成的强调语法"""
+    formatted_parts = []
+    for index, ((bold, italic), text) in enumerate(groups):
+        current_text = text
+        if index == 0 and not (bold or italic):
+            current_text = _escape_plain_markdown_text(current_text)
+        formatted_parts.append(_format_inline_markdown(current_text, bold=bold, italic=italic))
+    return "".join(formatted_parts)
+
+def _resolve_docx_style_font_flag(style, attr_name):
+    """沿样式继承链解析 tri-state 字体属性，返回 True/False/None"""
+    visited = set()
+    current = style
+    while current is not None:
+        style_id = id(current)
+        if style_id in visited:
+            break
+        visited.add(style_id)
+
+        font = getattr(current, "font", None)
+        value = getattr(font, attr_name, None) if font is not None else None
+        if value is not None:
+            return bool(value)
+
+        current = getattr(current, "base_style", None)
+
+    return None
+
+def _get_docx_heading_level(style):
+    """根据 Word 样式解析标题层级，无法识别时返回 None"""
+    if style is None:
+        return None
+
+    style_id = getattr(style, "style_id", "")
+    if isinstance(style_id, str) and style_id:
+        match = re.match(r"(?i)^heading(\d+)$", style_id.strip())
+        if match:
+            return int(match.group(1))
+
+    style_name = getattr(style, "name", "")
+    if isinstance(style_name, str) and style_name:
+        match = re.match(r"^(?:Heading|标题)\s*(\d+)$", style_name.strip())
+        if match:
+            return int(match.group(1))
+
+    return None
+
+def _resolve_docx_run_font_flag(run, paragraph, attr_name, *, allow_paragraph_style=False):
+    """解析 run 的实际粗体/斜体状态，支持字符样式和可选的段落样式继承"""
+    direct_value = getattr(run.font, attr_name, None)
+    if direct_value is not None:
+        return bool(direct_value)
+
+    char_style_value = _resolve_docx_style_font_flag(getattr(run, "style", None), attr_name)
+    if char_style_value is not None:
+        return char_style_value
+
+    if allow_paragraph_style:
+        paragraph_style_value = _resolve_docx_style_font_flag(getattr(paragraph, "style", None), attr_name)
+        if paragraph_style_value is not None:
+            return paragraph_style_value
+
+    return False
+
 def _validate_input_file(file_path):
     """校验并规范化输入文件路径"""
     if file_path is None:
@@ -1130,6 +1195,8 @@ def convert_docx(file_path, image_save_dir=None, image_rel_dir=None):
         style = para.style if hasattr(para, "style") else None
         style_name = style.name if style else ""
         style_id = getattr(style, "style_id", "") if style else ""
+        heading_level = _get_docx_heading_level(style)
+        allow_paragraph_style = heading_level is None
 
         # 先拼接富文本（列表项也需要保留粗体/斜体）
         # 将相邻同格式的 run 合并后再添加 Markdown 标记，避免 **text1****text2** 碎片
@@ -1138,30 +1205,20 @@ def convert_docx(file_path, image_save_dir=None, image_rel_dir=None):
             text = run.text
             if not text:
                 continue
-            fmt = (bool(run.bold), bool(run.italic))
+            fmt = (
+                _resolve_docx_run_font_flag(run, para, "bold", allow_paragraph_style=allow_paragraph_style),
+                _resolve_docx_run_font_flag(run, para, "italic", allow_paragraph_style=allow_paragraph_style),
+            )
             if groups and groups[-1][0] == fmt:
                 groups[-1] = (fmt, groups[-1][1] + text)
             else:
                 groups.append((fmt, text))
-        formatted_text = ""
-        for (bold, italic), text in groups:
-            formatted_text += _format_inline_markdown(text, bold=bold, italic=italic)
+        formatted_text = _compose_inline_markdown(groups)
         text_value = _normalize_text(formatted_text.strip() or para.text.strip())
         if not text_value:
             return ""
 
         # 识别标题层级
-        heading_level = None
-        if isinstance(style_id, str) and style_id:
-            m = re.match(r"(?i)^heading(\d+)$", style_id.strip())
-            if m:
-                heading_level = int(m.group(1))
-        if heading_level is None and isinstance(style_name, str) and style_name:
-            # 兼容中文 Word 默认标题样式（例如“标题 1”）
-            m = re.match(r"^(?:Heading|标题)\s*(\d+)$", style_name.strip())
-            if m:
-                heading_level = int(m.group(1))
-
         if heading_level is not None:
             heading_prefix = "#" * min(heading_level, 6)  # Markdown最多支持6级标题
             return f"{heading_prefix} {text_value}\n\n"
@@ -1190,7 +1247,7 @@ def convert_docx(file_path, image_save_dir=None, image_rel_dir=None):
             if "Number" in style_id_str or "Number" in style_name_str or style_name_str == "List Number":
                 return f"{indent}1. {text_value}\n"
 
-        return _escape_plain_markdown_text(text_value) + "\n\n"
+        return text_value + "\n\n"
 
     # 处理文档中的所有元素（段落和表格）
     # 需要按照它们在文档中的顺序处理
@@ -1629,6 +1686,19 @@ def convert_pptx(file_path, image_save_dir=None, image_rel_dir=None):
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     extracted_images = []
 
+    def _resolve_pptx_run_font_flag(run, paragraph, attr_name, *, allow_paragraph_style=False):
+        """解析 run 的实际粗体/斜体状态，支持段落默认格式回退"""
+        direct_value = getattr(run.font, attr_name, None)
+        if direct_value is not None:
+            return bool(direct_value)
+
+        if allow_paragraph_style:
+            paragraph_value = getattr(paragraph.font, attr_name, None)
+            if paragraph_value is not None:
+                return bool(paragraph_value)
+
+        return False
+
     def _process_text_frame(text_frame, role="body"):
         """处理文本框，保留段落层级和格式"""
         result = ""
@@ -1636,20 +1706,23 @@ def convert_pptx(file_path, image_save_dir=None, image_rel_dir=None):
             if not para.text.strip():
                 continue
 
+            allow_paragraph_style = role != "title"
+
             # 将相邻同格式的 run 合并后再添加 Markdown 标记，避免 **text1****text2** 碎片
             groups = []
             for run in para.runs:
                 text = run.text
                 if not text:
                     continue
-                fmt = (bool(run.font.bold), bool(run.font.italic))
+                fmt = (
+                    _resolve_pptx_run_font_flag(run, para, "bold", allow_paragraph_style=allow_paragraph_style),
+                    _resolve_pptx_run_font_flag(run, para, "italic", allow_paragraph_style=allow_paragraph_style),
+                )
                 if groups and groups[-1][0] == fmt:
                     groups[-1] = (fmt, groups[-1][1] + text)
                 else:
                     groups.append((fmt, text))
-            formatted = ""
-            for (bold, italic), text in groups:
-                formatted += _format_inline_markdown(text, bold=bold, italic=italic)
+            formatted = _compose_inline_markdown(groups)
             text_value = _normalize_text(formatted.strip() or para.text.strip())
             if not text_value:
                 continue
@@ -1674,7 +1747,7 @@ def convert_pptx(file_path, image_save_dir=None, image_rel_dir=None):
                 './/{http://schemas.openxmlformats.org/drawingml/2006/main}buAutoNum') is not None:
                 result += f"1. {text_value}\n"
             else:
-                result += _escape_plain_markdown_text(text_value) + "\n\n"
+                result += text_value + "\n\n"
 
         return result
 

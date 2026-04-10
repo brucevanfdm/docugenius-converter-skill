@@ -285,6 +285,75 @@ class ConvertDocumentTests(unittest.TestCase):
             self.assertIn("**Image**", markdown)
             self.assertIn("Caption: 这是图片说明", markdown)
 
+    def test_convert_pptx_preserves_direct_bold_at_paragraph_start(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            pptx_path = tmp_path / "direct-bold.pptx"
+            output_dir = tmp_path / "out"
+
+            presentation = Presentation()
+            slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+            textbox = slide.shapes.add_textbox(Inches(1), Inches(2.4), Inches(2.6), Inches(1))
+            paragraph = textbox.text_frame.paragraphs[0]
+            run = paragraph.add_run()
+            run.text = "AI组件检查"
+            run.font.bold = True
+            tail = paragraph.add_run()
+            tail.text = "。"
+            presentation.save(pptx_path)
+
+            result = convert_document(str(pptx_path), output_dir=str(output_dir))
+
+            self.assertTrue(result["success"], result)
+            self.assertIn("**AI组件检查**。", result["markdown_content"])
+            self.assertNotIn("\\**AI组件检查**。", result["markdown_content"])
+
+    def test_convert_pptx_preserves_bold_from_paragraph_default_font(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            pptx_path = tmp_path / "paragraph-bold.pptx"
+            output_dir = tmp_path / "out"
+
+            presentation = Presentation()
+            slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+            textbox = slide.shapes.add_textbox(Inches(1), Inches(2.4), Inches(2.6), Inches(1))
+            paragraph = textbox.text_frame.paragraphs[0]
+            run = paragraph.add_run()
+            run.text = "AI组件检查"
+            paragraph.font.bold = True
+            presentation.save(pptx_path)
+
+            result = convert_document(str(pptx_path), output_dir=str(output_dir))
+
+            self.assertTrue(result["success"], result)
+            self.assertIn("**AI组件检查**", result["markdown_content"])
+
+    def test_convert_pptx_title_does_not_add_redundant_bold_markdown(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            pptx_path = tmp_path / "title-bold.pptx"
+            output_dir = tmp_path / "out"
+
+            presentation = Presentation()
+            slide = presentation.slides.add_slide(presentation.slide_layouts[1])
+            title = slide.shapes.title.text_frame.paragraphs[0]
+            title.clear()
+            run = title.add_run()
+            run.text = "季度回顾"
+            title.font.bold = True
+
+            subtitle = slide.placeholders[1].text_frame.paragraphs[0]
+            subtitle.clear()
+            subtitle_run = subtitle.add_run()
+            subtitle_run.text = "销售趋势"
+            presentation.save(pptx_path)
+
+            result = convert_document(str(pptx_path), output_dir=str(output_dir))
+
+            self.assertTrue(result["success"], result)
+            self.assertIn("### 季度回顾", result["markdown_content"])
+            self.assertNotIn("### **季度回顾**", result["markdown_content"])
+
     def test_convert_docx_escapes_plain_markdown_syntax(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
@@ -301,6 +370,80 @@ class ConvertDocumentTests(unittest.TestCase):
             self.assertTrue(result["success"], result)
             self.assertIn("\\1. 这是正文，不是列表", result["markdown_content"])
             self.assertIn("\\# 这是正文，不是标题", result["markdown_content"])
+
+    def test_convert_docx_preserves_bold_from_character_style(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            docx_path = tmp_path / "char-style-bold.docx"
+            output_dir = tmp_path / "out"
+
+            document = Document()
+            strong_style = document.styles.add_style("StrongInline", WD_STYLE_TYPE.CHARACTER)
+            strong_style.font.bold = True
+
+            paragraph = document.add_paragraph()
+            paragraph.add_run("前文 ")
+            emphasis = paragraph.add_run("AI组件检查")
+            emphasis.style = strong_style
+            paragraph.add_run("。")
+            document.save(docx_path)
+
+            result = convert_document(str(docx_path), output_dir=str(output_dir))
+
+            self.assertTrue(result["success"], result)
+            self.assertIn("前文 **AI组件检查**。", result["markdown_content"])
+
+    def test_convert_docx_preserves_direct_bold_at_paragraph_start(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            docx_path = tmp_path / "direct-bold.docx"
+            output_dir = tmp_path / "out"
+
+            document = Document()
+            paragraph = document.add_paragraph()
+            emphasis = paragraph.add_run("AI组件检查")
+            emphasis.bold = True
+            paragraph.add_run("。")
+            document.save(docx_path)
+
+            result = convert_document(str(docx_path), output_dir=str(output_dir))
+
+            self.assertTrue(result["success"], result)
+            self.assertIn("**AI组件检查**。", result["markdown_content"])
+            self.assertNotIn("\\**AI组件检查**。", result["markdown_content"])
+
+    def test_convert_docx_preserves_bold_from_non_heading_paragraph_style(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            docx_path = tmp_path / "para-style-bold.docx"
+            output_dir = tmp_path / "out"
+
+            document = Document()
+            callout_style = document.styles.add_style("Callout", WD_STYLE_TYPE.PARAGRAPH)
+            callout_style.font.bold = True
+            document.add_paragraph("整段强调", style="Callout")
+            document.save(docx_path)
+
+            result = convert_document(str(docx_path), output_dir=str(output_dir))
+
+            self.assertTrue(result["success"], result)
+            self.assertIn("**整段强调**", result["markdown_content"])
+
+    def test_convert_docx_heading_style_does_not_add_redundant_bold_markdown(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            docx_path = tmp_path / "heading.docx"
+            output_dir = tmp_path / "out"
+
+            document = Document()
+            document.add_heading("章节标题", level=1)
+            document.save(docx_path)
+
+            result = convert_document(str(docx_path), output_dir=str(output_dir))
+
+            self.assertTrue(result["success"], result)
+            self.assertIn("# 章节标题", result["markdown_content"])
+            self.assertNotIn("# **章节标题**", result["markdown_content"])
 
     def test_convert_pdf_returns_clear_error_when_no_content_extracted(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
