@@ -17,6 +17,7 @@ import sys
 import os
 import json
 import importlib
+import logging
 import re
 import subprocess
 import shutil
@@ -64,6 +65,14 @@ _IMAGE_SIGNATURES = {
     b'\xd7\xcd\xc6\x9a': 'wmf',
     b'\x01\x00\x00\x00': 'emf',
 }
+
+logger = logging.getLogger(__name__)
+
+_RE_COLLAPSE_WHITESPACE = re.compile(r"\s+")
+_RE_COLLAPSE_EXTRA_BLANK_LINES = re.compile(r"\n{3,}")
+_RE_ESCAPE_MARKDOWN_LEADING = re.compile(r"^([>#\-\+\*])")
+_RE_ESCAPE_MARKDOWN_ORDERED_LIST = re.compile(r"^(\d+)\.\s")
+_RE_WRAP_INLINE_MARKDOWN = re.compile(r"^(\s*)(.*?)(\s*)$", re.DOTALL)
 
 def _configure_windows_stdio():
     """
@@ -366,11 +375,11 @@ def _normalize_text(value, preserve_newlines=False):
 
     text = str(value).replace("\r\n", "\n").replace("\r", "\n")
     if preserve_newlines:
-        lines = [re.sub(r"\s+", " ", line).strip() for line in text.split("\n")]
+        lines = [_RE_COLLAPSE_WHITESPACE.sub(" ", line).strip() for line in text.split("\n")]
         text = "\n".join(line for line in lines if line)
-        return re.sub(r"\n{3,}", "\n\n", text).strip()
+        return _RE_COLLAPSE_EXTRA_BLANK_LINES.sub("\n\n", text).strip()
 
-    text = re.sub(r"\s+", " ", text.replace("\n", " "))
+    text = _RE_COLLAPSE_WHITESPACE.sub(" ", text.replace("\n", " "))
     return text.strip()
 
 def _escape_plain_markdown_text(text):
@@ -379,8 +388,8 @@ def _escape_plain_markdown_text(text):
         return ""
 
     escaped = text
-    escaped = re.sub(r"^([>#\-\+\*])", r"\\\1", escaped)
-    escaped = re.sub(r"^(\d+)\.\s", r"\\\1. ", escaped)
+    escaped = _RE_ESCAPE_MARKDOWN_LEADING.sub(r"\\\1", escaped)
+    escaped = _RE_ESCAPE_MARKDOWN_ORDERED_LIST.sub(r"\\\1. ", escaped)
     return escaped
 
 def _format_inline_markdown(text, *, bold=False, italic=False):
@@ -391,7 +400,7 @@ def _format_inline_markdown(text, *, bold=False, italic=False):
     if not (bold or italic):
         return text
 
-    match = re.match(r"^(\s*)(.*?)(\s*)$", text, re.DOTALL)
+    match = _RE_WRAP_INLINE_MARKDOWN.match(text)
     if not match:
         return text
 
@@ -522,7 +531,7 @@ def _build_docx_numbering_index(doc):
     """构建 numId -> 抽象编号定义 的索引，支持多级编号渲染"""
     try:
         root = ET.fromstring(doc.part.numbering_part.element.xml)
-    except Exception:
+    except (AttributeError, ET.ParseError, TypeError):
         return {}, {}
 
     num_to_abstract = {}
@@ -922,7 +931,8 @@ def _save_extracted_image(data, image_save_dir, image_rel_dir, base_name, image_
             f.write(data)
         # 使用正斜杠确保 Markdown 跨平台兼容
         return f"{image_rel_dir}/{filename}"
-    except Exception:
+    except OSError:
+        logger.debug("Failed to save extracted image: %s", abs_path, exc_info=True)
         return None
 
 
@@ -976,7 +986,7 @@ def convert_docx(file_path, image_save_dir=None, image_rel_dir=None):
     content = ""
     num_to_abstract, abstract_levels = _build_docx_numbering_index(doc)
     numbering_state = {}
-    image_counter = [0]  # 使用列表以便在内部函数中修改
+    image_counter = 0
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     extracted_images = []
 
@@ -988,6 +998,8 @@ def convert_docx(file_path, image_save_dir=None, image_rel_dir=None):
         Returns:
             图片 Markdown 字符串列表
         """
+        nonlocal image_counter
+
         if image_save_dir is None:
             return []
 
@@ -1043,6 +1055,7 @@ def convert_docx(file_path, image_save_dir=None, image_rel_dir=None):
                     continue
                 image_data = image_part.blob
             except Exception:
+                logger.debug("Failed to read DOCX image part: %s", embed_id, exc_info=True)
                 continue
 
             if not image_data:
@@ -1053,10 +1066,10 @@ def convert_docx(file_path, image_save_dir=None, image_rel_dir=None):
                 continue
 
             # 保存图片
-            image_counter[0] += 1
+            image_counter += 1
             rel_path = _save_extracted_image(
                 image_data, image_save_dir, image_rel_dir,
-                base_name, image_counter[0]
+                base_name, image_counter
             )
             if rel_path:
                 extracted_images.append(rel_path)
@@ -1232,7 +1245,7 @@ def convert_xlsx(file_path, image_save_dir=None, image_rel_dir=None):
 
     workbook = openpyxl.load_workbook(file_path, data_only=True)
     content = ""
-    image_counter = [0]
+    image_counter = 0
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     extracted_images = []
 
@@ -1551,6 +1564,7 @@ def convert_xlsx(file_path, image_save_dir=None, image_rel_dir=None):
                             col = getattr(anchor_from, 'col', 0) if anchor_from else 0
                             sorted_images.append((row, col, img_obj))
                         except Exception:
+                            logger.debug("Failed to read XLSX image anchor; falling back to default order", exc_info=True)
                             sorted_images.append((0, 0, img_obj))
                     sorted_images.sort(key=lambda x: (x[0], x[1]))
 
@@ -1584,18 +1598,19 @@ def convert_xlsx(file_path, image_save_dir=None, image_rel_dir=None):
                             if _is_decorative_image(image_data):
                                 continue
 
-                            image_counter[0] += 1
+                            image_counter += 1
                             rel_path = _save_extracted_image(
                                 image_data, image_save_dir, image_rel_dir,
-                                base_name, image_counter[0]
+                                base_name, image_counter
                             )
                             if rel_path:
                                 extracted_images.append(rel_path)
                                 content += f"{_make_image_markdown(rel_path)}\n\n"
                         except Exception:
+                            logger.debug("Failed to extract an XLSX embedded image; skipping it", exc_info=True)
                             continue
                 except Exception:
-                    pass
+                    logger.debug("Failed to inspect XLSX worksheet images; continuing without them", exc_info=True)
     finally:
         workbook.close()
 
@@ -1610,7 +1625,7 @@ def convert_pptx(file_path, image_save_dir=None, image_rel_dir=None):
     content = ""
     slide_width = presentation.slide_width
     slide_height = presentation.slide_height
-    image_counter = [0]
+    image_counter = 0
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     extracted_images = []
 
@@ -1906,8 +1921,8 @@ def convert_pptx(file_path, image_save_dir=None, image_rel_dir=None):
                                         break
                             if cnv_pr is not None:
                                 is_decorative, alt_text = _check_ooxml_decorative_flag(cnv_pr)
-                        except Exception:
-                            pass
+                        except (AttributeError, ET.ParseError, TypeError):
+                            logger.debug("Failed to parse PPTX picture metadata; continuing without decorative flag", exc_info=True)
 
                         # 检查是否为背景图（覆盖面积 >= 90% 幻灯片）
                         is_background = False
@@ -1922,17 +1937,17 @@ def convert_pptx(file_path, image_save_dir=None, image_rel_dir=None):
                             is_decorative_flag=is_decorative,
                             is_pptx_background=is_background
                         ):
-                            image_counter[0] += 1
+                            image_counter += 1
                             rel_path = _save_extracted_image(
                                 image_data, image_save_dir, image_rel_dir,
-                                base_name, image_counter[0]
+                                base_name, image_counter
                             )
                             if rel_path:
                                 extracted_images.append(rel_path)
                                 entry["image_path"] = rel_path
                                 entry["image_alt"] = alt_text
                     except Exception:
-                        pass
+                        logger.debug("Failed to extract a PPTX picture; skipping it", exc_info=True)
             elif getattr(shape, "shape_type", None) == MSO_SHAPE_TYPE.DIAGRAM:
                 entry["kind"] = "diagram"
                 entry["markdown"] = _render_diagram_markdown(shape)
