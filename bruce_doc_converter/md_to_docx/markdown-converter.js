@@ -8,11 +8,13 @@ const { renderMermaidToDataUrl } = require('./mermaid-renderer');
 /**
  * 将 Markdown 文本转换为 HTML
  * @param {string} markdown - Markdown 文本
- * @returns {Promise<string>} HTML 字符串
+ * @returns {Promise<{html: string, warnings: string[]}>}
  */
 async function markdownToHTML(markdown) {
+  const warnings = [];
+
   if (!markdown || typeof markdown !== 'string') {
-    return '';
+    return { html: '', warnings };
   }
 
   // 统一换行符，避免不同平台导致的列表解析失败
@@ -39,6 +41,9 @@ async function markdownToHTML(markdown) {
   html = protectedLinks.text;
   const images = protectedLinks.images;
   const links = protectedLinks.links;
+
+  // 4. 转义剩余原文中的 HTML 特殊字符（占位符与后续自生成标签不受影响）
+  html = escapeHTML(html);
 
   // 处理标题
   html = html.replace(/^######\s+(.+)$/gm, '<h6>$1</h6>');
@@ -71,14 +76,20 @@ async function markdownToHTML(markdown) {
   // 处理水平线
   html = html.replace(/^(-{3,}|_{3,}|\*{3,})$/gm, '<hr>');
 
-  // 恢复图片（alt 文本中的粗体斜体已在前面处理）
+  // 恢复图片（属性做二次转义，防止 URL/alt 破坏 HTML）
   images.forEach((img, i) => {
-    html = html.replace(`\x00IMAGE${i}\x00`, () => `<img src="${img.url}" alt="${img.alt}">`);
+    html = html.replace(
+      `\x00IMAGE${i}\x00`,
+      () => `<img src="${escapeHTML(img.url)}" alt="${escapeHTML(img.alt)}">`
+    );
   });
 
   // 恢复链接
   links.forEach((link, i) => {
-    html = html.replace(`\x00LINK${i}\x00`, () => `<a href="${link.url}">${link.text}</a>`);
+    html = html.replace(
+      `\x00LINK${i}\x00`,
+      () => `<a href="${escapeHTML(link.url)}">${escapeHTML(link.text)}</a>`
+    );
   });
 
   // 恢复行内代码
@@ -86,7 +97,7 @@ async function markdownToHTML(markdown) {
     html = html.replace(`\x00INLINECODE${i}\x00`, () => `<code>${escapeHTML(code)}</code>`);
   });
 
-  // 恢复代码块
+  // 恢复代码块 / Mermaid
   for (let i = 0; i < codeBlocks.length; i++) {
     const block = codeBlocks[i];
     const language = (block.lang || '').trim().toLowerCase();
@@ -101,6 +112,8 @@ async function markdownToHTML(markdown) {
           () => `<div><img src="${rendered.dataUrl}" alt="Mermaid Diagram"${widthAttr}${heightAttr}></div>`
         );
       } else {
+        const detail = rendered.error || '未知错误';
+        warnings.push(`Mermaid 渲染失败: ${detail}`);
         html = html.replace(
           `\x00CODEBLOCK${i}\x00`,
           () => `<pre><code class="language-mermaid">${escapeHTML(block.code)}</code></pre>`
@@ -119,13 +132,16 @@ async function markdownToHTML(markdown) {
   // 处理段落（放在最后，避免把代码块/图表包进段落）
   html = processParagraphs(html);
 
-  return html;
+  return { html, warnings };
 }
 
 /**
  * 转义 HTML 特殊字符
  */
 function escapeHTML(text) {
+  if (text == null) {
+    return '';
+  }
   const map = {
     '&': '&amp;',
     '<': '&lt;',
@@ -133,7 +149,7 @@ function escapeHTML(text) {
     '"': '&quot;',
     "'": '&#039;'
   };
-  return text.replace(/[&<>"']/g, char => map[char]);
+  return String(text).replace(/[&<>"']/g, char => map[char]);
 }
 
 function normalizeCodeBlockContent(code) {
@@ -602,9 +618,11 @@ function processBlockquotes(html) {
   };
 
   for (const line of lines) {
-    const match = line.match(/^>\s?(.*)/);
-    if (match) {
-      blockquoteLines.push(match[1]);
+    const match = line.match(/^&gt;\s?(.*)/);
+    // 原文 `>` 在 escapeHTML 后变成 `&gt;`；兼容未转义输入
+    const rawMatch = match || line.match(/^>\s?(.*)/);
+    if (rawMatch) {
+      blockquoteLines.push(rawMatch[1]);
     } else {
       flushBlockquote();
       result.push(line);
@@ -616,5 +634,6 @@ function processBlockquotes(html) {
 }
 
 module.exports = {
-  markdownToHTML
+  markdownToHTML,
+  escapeHTML
 };

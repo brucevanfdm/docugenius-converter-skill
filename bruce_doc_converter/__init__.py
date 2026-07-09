@@ -1,3 +1,4 @@
 """Agent-facing document converter CLI."""
 
-__version__ = "0.1.6"
+# Keep in sync with pyproject.toml [project].version
+__version__ = "0.2.1"

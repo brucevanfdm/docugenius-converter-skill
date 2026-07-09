@@ -2740,6 +2740,9 @@ def convert_md(file_path, output_dir=None, mermaid_scale=None):
             output = json.loads(stdout_text)
             if not output.get('success') and not output.get('error_code'):
                 output['error_code'] = 'NODE_CONVERSION_FAILED'
+            # 规范化 Node 侧 warnings，便于 CLI 统一透传
+            if output.get('success') and 'warnings' in output and not isinstance(output.get('warnings'), list):
+                output['warnings'] = [str(output['warnings'])]
             return output
         except json.JSONDecodeError:
             if result.returncode == 0:

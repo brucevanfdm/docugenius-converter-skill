@@ -8,6 +8,28 @@ const fs = require('fs');
 const path = require('path');
 
 /**
+ * 生成不覆盖已有文件的输出路径
+ * @param {string} outputDir
+ * @param {string} baseName
+ * @returns {string}
+ */
+function resolveUniqueDocxPath(outputDir, baseName) {
+  let outputPath = path.join(outputDir, `${baseName}.docx`);
+  if (!fs.existsSync(outputPath)) {
+    return outputPath;
+  }
+
+  let counter = 2;
+  while (true) {
+    outputPath = path.join(outputDir, `${baseName}.${counter}.docx`);
+    if (!fs.existsSync(outputPath)) {
+      return outputPath;
+    }
+    counter += 1;
+  }
+}
+
+/**
  * 将 Markdown 文件转换为 DOCX
  * @param {string} inputPath - 输入的 Markdown 文件路径
  * @param {string} outputDir - 输出目录（可选）
@@ -25,15 +47,19 @@ async function convertMarkdownToDocx(inputPath, outputDir) {
       return { success: false, error: `文件不存在: ${inputPath}` };
     }
 
-    // 读取 Markdown 文件
-    const markdown = fs.readFileSync(inputPath, 'utf-8');
+    // 读取 Markdown 文件（容忍 UTF-8 BOM）
+    let markdown = fs.readFileSync(inputPath, 'utf-8');
+    if (markdown.charCodeAt(0) === 0xFEFF) {
+      markdown = markdown.slice(1);
+    }
 
     // Markdown -> HTML
-    const html = await markdownToHTML(markdown);
+    const { html, warnings: mdWarnings } = await markdownToHTML(markdown);
 
     // HTML -> DOCX 组件（传入 Markdown 文件所在目录，用于解析相对路径图片）
     const mdDir = path.dirname(path.resolve(inputPath));
-    const docxChildren = convertHTMLToDocx(html, mdDir);
+    const { children: docxChildren, warnings: htmlWarnings } = convertHTMLToDocx(html, mdDir);
+    const warnings = [...(mdWarnings || []), ...(htmlWarnings || [])];
 
     // 创建文档
     const doc = new Document({
@@ -61,17 +87,21 @@ async function convertMarkdownToDocx(inputPath, outputDir) {
       fs.mkdirSync(finalOutputDir, { recursive: true });
     }
 
-    const outputPath = path.join(finalOutputDir, `${baseName}.docx`);
+    const outputPath = resolveUniqueDocxPath(finalOutputDir, baseName);
 
     // 生成并保存文档
     const buffer = await Packer.toBuffer(doc);
     fs.writeFileSync(outputPath, buffer);
 
-    return {
+    const result = {
       success: true,
       output_path: outputPath,
       message: `转换成功: ${outputPath}`
     };
+    if (warnings.length > 0) {
+      result.warnings = warnings;
+    }
+    return result;
 
   } catch (error) {
     return {
@@ -110,4 +140,11 @@ async function main() {
   process.exit(result.success ? 0 : 1);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  convertMarkdownToDocx,
+  resolveUniqueDocxPath
+};

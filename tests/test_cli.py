@@ -165,6 +165,32 @@ class CliTests(unittest.TestCase):
         self.assertTrue(payload["retryable"])
         self.assertEqual("bdc setup-node", payload["next_command"])
 
+    def test_normalize_result_merges_warnings_list_for_md(self):
+        payload = cli._normalize_single_result(
+            "/tmp/input.md",
+            {
+                "success": True,
+                "output_path": "/tmp/out.docx",
+                "message": "ok",
+                "warning": "legacy single warning",
+                "warnings": [
+                    "Mermaid 渲染失败: timeout",
+                    "图片无法嵌入（不支持远程 URL）: https://example.com/a.png",
+                    "legacy single warning",
+                ],
+            },
+        )
+
+        self.assertTrue(payload["success"])
+        self.assertEqual(
+            [
+                "legacy single warning",
+                "Mermaid 渲染失败: timeout",
+                "图片无法嵌入（不支持远程 URL）: https://example.com/a.png",
+            ],
+            payload["warnings"],
+        )
+
 
 class CliConvertTests(unittest.TestCase):
     def run_cli(self, *args, cwd=None):

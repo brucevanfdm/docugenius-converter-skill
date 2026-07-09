@@ -18,6 +18,13 @@ const NODE_TYPE = {
 
 const MAX_LIST_LEVEL = 4;
 
+// 每个独立的顶层有序列表使用不同 instance，Word 才会重新从 1 编号。
+// 同一列表树（含嵌套 OL）共享同一 instance。
+let _orderedListInstanceCounter = 0;
+
+// 单次 convertHTMLToDocx 调用期间的告警（图片无法嵌入等）
+let _conversionWarnings = [];
+
 // Emoji 正则：匹配常见 Emoji 字符（包括组合 Emoji）
 const EMOJI_REGEX = /(\p{Emoji_Presentation}|\p{Extended_Pictographic}(?:\u{FE0F}|\u{200D}\p{Extended_Pictographic})*)/gu;
 
@@ -143,10 +150,14 @@ function parseBitmapSize(buffer, type) {
 /**
  * 将 HTML 字符串转换为 docx 组件数组
  * @param {string} htmlString - HTML 字符串
- * @returns {Array} docx 组件数组
+ * @param {string} [basePath] - Markdown 所在目录，用于解析相对图片
+ * @returns {{children: Array, warnings: string[]}}
  */
 function convertHTMLToDocx(htmlString, basePath) {
   _basePath = (basePath && typeof basePath === 'string') ? basePath : null;
+  // 每次转换重置，避免多次 convert 时 instance / warnings 串号
+  _orderedListInstanceCounter = 0;
+  _conversionWarnings = [];
   const dom = new JSDOM(`<body>${htmlString}</body>`);
   const temp = dom.window.document.body;
 
@@ -163,7 +174,10 @@ function convertHTMLToDocx(htmlString, basePath) {
     }
   }
 
-  return children.length > 0 ? children : [new Paragraph({ text: '' })];
+  return {
+    children: children.length > 0 ? children : [new Paragraph({ text: '' })],
+    warnings: _conversionWarnings.slice()
+  };
 }
 
 /**
@@ -188,40 +202,25 @@ function convertNode(node) {
 
     switch (tagName) {
       case 'H1':
-        return new Paragraph({
-          children: createTextRunsWithEmoji(node.textContent),
-          style: "Heading1"
-        });
-
       case 'H2':
-        return new Paragraph({
-          children: createTextRunsWithEmoji(node.textContent),
-          style: "Heading2"
-        });
-
       case 'H3':
-        return new Paragraph({
-          children: createTextRunsWithEmoji(node.textContent),
-          style: "Heading3"
-        });
-
       case 'H4':
-        return new Paragraph({
-          children: createTextRunsWithEmoji(node.textContent),
-          style: "Heading4"
-        });
-
       case 'H5':
+      case 'H6': {
+        const headingStyle = {
+          H1: 'Heading1',
+          H2: 'Heading2',
+          H3: 'Heading3',
+          H4: 'Heading4',
+          H5: 'Heading5',
+          H6: 'Heading6'
+        }[tagName];
+        const headingRuns = convertInlineNodes(node.childNodes);
         return new Paragraph({
-          children: createTextRunsWithEmoji(node.textContent),
-          style: "Heading5"
+          children: headingRuns.length > 0 ? headingRuns : [new TextRun('')],
+          style: headingStyle
         });
-
-      case 'H6':
-        return new Paragraph({
-          children: createTextRunsWithEmoji(node.textContent),
-          style: "Heading6"
-        });
+      }
 
       case 'P':
         return convertParagraph(node);
@@ -243,7 +242,19 @@ function convertNode(node) {
         return convertImage(node);
 
       case 'HR':
-        return null;
+        return new Paragraph({
+          border: {
+            bottom: {
+              color: '9CA3AF',
+              space: 1,
+              style: BorderStyle.SINGLE,
+              size: 12
+            }
+          },
+          spacing: { before: 200, after: 200 },
+          indent: { firstLine: 0 },
+          children: []
+        });
 
       case 'BR':
         return new Paragraph({ text: '' });
@@ -318,6 +329,8 @@ function convertImage(imgElement) {
     });
   }
 
+  pushImageEmbedWarning(src, alt);
+
   let description = '[图片]';
   if (alt) {
     description = `[图片: ${alt}]`;
@@ -331,6 +344,25 @@ function convertImage(imgElement) {
     indent: { firstLine: 0 },
     spacing: { before: 200, after: 200 }
   });
+}
+
+function pushImageEmbedWarning(src, alt) {
+  const label = src || alt || '(空 src)';
+  if (/^https?:\/\//i.test(src)) {
+    _conversionWarnings.push(`图片无法嵌入（不支持远程 URL）: ${label}`);
+    return;
+  }
+  if (src.startsWith('file://')) {
+    _conversionWarnings.push(`图片无法嵌入（不支持 file://）: ${label}`);
+    return;
+  }
+  if (src && path.isAbsolute(src)) {
+    _conversionWarnings.push(`图片无法嵌入（禁止绝对路径）: ${label}`);
+    return;
+  }
+  if (src) {
+    _conversionWarnings.push(`图片无法嵌入: ${label}`);
+  }
 }
 
 function createImageRun(imgElement) {
@@ -552,12 +584,21 @@ function normalizeInlineText(text) {
 
 /**
  * 转换列表元素
+ * @param {Element} listElement - UL/OL 节点
+ * @param {number} level - 嵌套层级
+ * @param {number|null} orderedInstance - 有序列表编号实例；同一列表树共享，独立列表各用新值
  */
-function convertList(listElement, level = 0) {
+function convertList(listElement, level = 0, orderedInstance = null) {
   const paragraphs = [];
   const isOrdered = listElement.nodeName === 'OL';
   const reference = isOrdered ? "numbered-list" : "bullet-list";
   const safeLevel = Math.min(level, MAX_LIST_LEVEL);
+
+  // 独立的有序列表（顶层或挂在无序列表下的新 OL）分配新 instance，Word 才会从 1 重新编号
+  let listOrderedInstance = orderedInstance;
+  if (isOrdered && listOrderedInstance == null) {
+    listOrderedInstance = _orderedListInstanceCounter++;
+  }
 
   // 避免 :scope 在部分环境兼容性不佳，手动筛选直接子元素
   const listItems = Array.from(listElement.childNodes).filter(child =>
@@ -575,7 +616,9 @@ function convertList(listElement, level = 0) {
       };
 
       if (numbered) {
-        options.numbering = { reference: reference, level: safeLevel };
+        options.numbering = isOrdered
+          ? { reference, level: safeLevel, instance: listOrderedInstance }
+          : { reference, level: safeLevel };
         options.indent = { firstLine: 0 };
       } else {
         // 列表项续行：缩进以对齐列表文本，取消首行缩进
@@ -604,7 +647,9 @@ function convertList(listElement, level = 0) {
             flushRuns(false);
           }
 
-          const nestedParagraphs = convertList(child, level + 1);
+          // 嵌套 OL 继承父有序列表 instance；嵌套在 UL 下的 OL 会自行分配新 instance
+          const nestedInstance = tagName === 'OL' ? listOrderedInstance : null;
+          const nestedParagraphs = convertList(child, level + 1, nestedInstance);
           paragraphs.push(...nestedParagraphs);
           continue;
         }
@@ -865,6 +910,7 @@ function convertInlineNodes(nodes, options = {}) {
         } else {
           const alt = node.getAttribute('alt') || '图片';
           const src = node.getAttribute('src') || '';
+          pushImageEmbedWarning(src, alt);
           const fallbackText = src ? `[图片: ${alt}] (${src})` : `[图片: ${alt}]`;
           runs.push(...createTextRunsWithEmoji(fallbackText, {
             ...runStyle,

@@ -2,8 +2,7 @@ import argparse
 import json
 import os
 import sys
-from importlib.metadata import version as _pkg_version, PackageNotFoundError as _PkgNotFoundError
-
+from bruce_doc_converter import __version__
 from bruce_doc_converter.converter import (
     SUPPORTED_EXTENSIONS,
     batch_convert,
@@ -119,6 +118,14 @@ def _normalize_single_result(input_path, result):
             payload["extracted_images"] = result.get("extracted_images", [])
         if result.get("warning"):
             payload["warnings"].append(result["warning"])
+        extra_warnings = result.get("warnings")
+        if isinstance(extra_warnings, list):
+            for item in extra_warnings:
+                if item is None:
+                    continue
+                text = item if isinstance(item, str) else str(item)
+                if text and text not in payload["warnings"]:
+                    payload["warnings"].append(text)
         return payload
 
     error = result.get("error", "转换失败")
@@ -140,14 +147,10 @@ def _normalize_single_result(input_path, result):
 
 
 def _help_payload():
-    try:
-        cli_version = _pkg_version("bruce-doc-converter")
-    except _PkgNotFoundError:
-        cli_version = "unknown"
     return {
         "schema_version": SCHEMA_VERSION,
         "success": True,
-        "cli_version": cli_version,
+        "cli_version": __version__,
         "commands": {
             "convert": "Convert one .docx/.xlsx/.pptx/.pdf file to Markdown, or one .md file to DOCX.",
             "batch": "Convert supported files in a directory.",
